@@ -222,3 +222,9 @@ impl RecordDefinitionBuilder {
         }
     }
 }
+
+impl Default for RecordDefinitionBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
