@@ -1,13 +1,39 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, From)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
 
 #[derive(Debug, new)]
-struct DatumDefinition {
+pub struct DatumDefinition {
     id: DatumId,
     offset: usize,
     size: usize,
+    type_name: &'static str,
+}
+
+impl DatumDefinition {
+    pub fn id(&self) -> DatumId {
+        self.id
+    }
+
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+}
+
+impl Display for DatumDefinition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({}, {})", self.id, self.type_name, self.size)?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -16,28 +42,40 @@ struct DatumDefinitionCollection {
 }
 
 impl DatumDefinitionCollection {
+    fn iter(&self) -> impl Iterator<Item = &DatumDefinition> {
+        self.data.iter()
+    }
+
     fn get(&self, id: DatumId) -> Option<&DatumDefinition> {
         self.data.get(id.0)
     }
 
-    fn push(&mut self, offset: usize, size: usize) -> DatumId {
+    fn push(&mut self, offset: usize, size: usize, type_name: &'static str) -> DatumId {
         let id = DatumId::from(self.data.len());
-        let datum = DatumDefinition::new(id, offset, size);
+        let datum = DatumDefinition::new(id, offset, size, type_name);
         self.data.push(datum);
         id
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Display, From)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct RecordVariantId(usize);
 
 #[derive(Debug)]
-struct RecordVariant {
+pub struct RecordVariant {
     id: RecordVariantId,
     data: Vec<DatumId>,
 }
 
 impl RecordVariant {
+    pub fn id(&self) -> RecordVariantId {
+        self.id
+    }
+
+    pub fn data(&self) -> &[DatumId] {
+        &self.data
+    }
+
     fn fmt_representation(
         &self,
         datum_definitions: &DatumDefinitionCollection,
@@ -55,9 +93,9 @@ impl RecordVariant {
                 panic!("offset clash {} > {}", byte_offset, datum.offset);
             }
             if byte_offset < datum.offset {
-                write!(f, "void ({}), ", datum.offset - byte_offset)?;
+                write!(f, "(void, {}), ", datum.offset - byte_offset)?;
             }
-            write!(f, "{} ({})", datum.id, datum.size)?;
+            write!(f, "{}", datum)?;
             first = false;
             byte_offset = datum.offset + datum.size;
         }
@@ -86,6 +124,24 @@ impl Display for RecordVariant {
 pub struct RecordDefinition {
     datum_definitions: DatumDefinitionCollection,
     variants: Vec<RecordVariant>,
+}
+
+impl RecordDefinition {
+    pub fn datum_definitions(&self) -> impl Iterator<Item = &DatumDefinition> {
+        self.datum_definitions.iter()
+    }
+
+    pub fn variants(&self) -> impl Iterator<Item = &RecordVariant> {
+        self.variants.iter()
+    }
+
+    pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
+        self.variants.get(id.0)
+    }
+
+    pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition> {
+        self.datum_definitions.get(id)
+    }
 }
 
 impl Display for RecordDefinition {
@@ -144,7 +200,8 @@ impl RecordVariantBuilder {
             }
         }
 
-        let datum_id = datum_definitions.push(byte_carret, size);
+        let type_name = std::any::type_name::<T>();
+        let datum_id = datum_definitions.push(byte_carret, size, type_name);
         self.data.insert(data_carret, datum_id);
         datum_id
     }

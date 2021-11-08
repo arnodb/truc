@@ -28,15 +28,15 @@ mod tests {
         let f = definition.add_datum::<u32>();
         let rv4 = definition.close_record_variant();
 
-        let record = definition.build();
-        let def = record.to_string();
+        let definition = definition.build();
+        let def = definition.to_string();
         assert_eq!(
             def,
             format!(
-                r#"{} [{} (4), {} (4)]
-{} [{} (4), {} (4), {} (4)]
-{} [void (4), {} (4), {} (4)]
-{} [{} (1), {} (2), void (1), {} (4), {} (4), {} (4)]
+                r#"{} [{} (u32, 4), {} (u32, 4)]
+{} [{} (u32, 4), {} (u32, 4), {} (u32, 4)]
+{} [(void, 4), {} (u32, 4), {} (u32, 4)]
+{} [{} (u8, 1), {} (u16, 2), (void, 1), {} (u32, 4), {} (u32, 4), {} (u32, 4)]
 "#,
                 rv1, a, b, rv2, a, b, c, rv3, b, c, rv4, d, e, b, c, f
             )
