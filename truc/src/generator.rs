@@ -68,9 +68,11 @@ pub fn generate<W: Write>(
                 })
                 .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e);
 
-            let plus_record_name = format!("ToRecord{}", variant.id());
+            let plus_record_name = format!("RecordIn{}", variant.id());
+            let and_out_record_name = format!("Record{}AndOut", variant.id());
 
             generate_data_record(&plus_record_name, &plus_data, &mut scope);
+            generate_data_out_record(&and_out_record_name, &record_name, &minus_data, &mut scope);
 
             generate_from_previous_record_impl(
                 &record_name,
@@ -78,6 +80,16 @@ pub fn generate<W: Write>(
                 &plus_record_name,
                 &minus_data,
                 &plus_data,
+                &mut scope,
+            );
+
+            generate_from_previous_record_minus_impl(
+                &record_name,
+                &prev_record_name,
+                &plus_record_name,
+                &minus_data,
+                &plus_data,
+                &and_out_record_name,
                 &mut scope,
             );
         }
@@ -192,7 +204,7 @@ fn generate_from_previous_record_impl(
     plus_data: &[&DatumDefinition],
     scope: &mut Scope,
 ) {
-    let from_type = format!("({}<CAP>, {})", prev_record_name, plus_record_name);
+    let from_type = format!("({}<{}>, {})", prev_record_name, CAP, plus_record_name);
     let from_impl = scope
         .new_impl(record_name)
         .generic(CAP_GENERIC)
@@ -235,8 +247,88 @@ fn generate_from_previous_record_impl(
     from_fn.line("Self { data }");
 }
 
+fn generate_from_previous_record_minus_impl(
+    record_name: &str,
+    prev_record_name: &str,
+    plus_record_name: &str,
+    minus_data: &[&DatumDefinition],
+    plus_data: &[&DatumDefinition],
+    and_out_record_name: &str,
+    scope: &mut Scope,
+) {
+    let from_type = format!("({}<{}>, {})", prev_record_name, CAP, plus_record_name);
+    let from_impl = scope
+        .new_impl(and_out_record_name)
+        .generic(CAP_GENERIC)
+        .target_generic(CAP)
+        .impl_trait(format!("From<{}>", from_type));
+
+    let from_fn = from_impl
+        .new_fn("from")
+        .arg(
+            &format!(
+                "(from, {}plus)",
+                if plus_data.is_empty() { "_" } else { "" }
+            ),
+            from_type,
+        )
+        .ret("Self");
+
+    for datum in minus_data {
+        from_fn.line(format!(
+            "let {}: {} = unsafe {{ from.data.read({}) }};",
+            datum.name(),
+            datum.type_name(),
+            datum.offset(),
+        ));
+    }
+
+    from_fn.line("let manually_drop = std::mem::ManuallyDrop::new(from);");
+    from_fn.line(format!(
+        "let {}data = unsafe {{ std::ptr::read(&(*manually_drop).data) }};",
+        if plus_data.is_empty() { "" } else { "mut " }
+    ));
+
+    for datum in plus_data {
+        from_fn.line(format!(
+            "unsafe {{ data.write({}, plus.{}); }}",
+            datum.offset(),
+            datum.name(),
+        ));
+    }
+    from_fn.line(format!("let record = {} {{ data }};", record_name));
+    from_fn.line(format!(
+        "{} {{ record{} }}",
+        and_out_record_name,
+        minus_data
+            .iter()
+            .flat_map(|datum| [", ", datum.name()])
+            .collect::<String>()
+    ));
+}
+
 fn generate_data_record(record_name: &str, data: &[&DatumDefinition], scope: &mut Scope) {
     let record = scope.new_struct(record_name).vis("pub");
+
+    for datum in data {
+        record.field(&format!("pub {}", datum.name()), datum.type_name());
+    }
+}
+
+fn generate_data_out_record(
+    record_name: &str,
+    inside_record_name: &str,
+    data: &[&DatumDefinition],
+    scope: &mut Scope,
+) {
+    let record = scope
+        .new_struct(record_name)
+        .vis("pub")
+        .generic(CAP_GENERIC);
+
+    let mut inside_record_type = Type::new(inside_record_name);
+    inside_record_type.generic(CAP);
+    record.field("pub record", inside_record_type);
 
     for datum in data {
         record.field(&format!("pub {}", datum.name()), datum.type_name());

@@ -51,7 +51,7 @@ fn main() {
     let datum_c = *record_0.datum_a() + *record_0.datum_b();
     *record_0.datum_a_mut() = 42;
 
-    let mut record_1 = Record1::from((record_0, ToRecord1 { datum_c }));
+    let mut record_1 = Record1::from((record_0, RecordIn1 { datum_c }));
 
     assert_eq!(*record_1.datum_a(), 42);
     assert_eq!(*record_1.datum_b(), 2);
@@ -59,14 +59,19 @@ fn main() {
 
     *record_1.datum_b_mut() = 12;
 
-    let record_2 = Record2::from((record_1, ToRecord2 {}));
+    let Record2AndOut {
+        record: record_2,
+        datum_a,
+    } = Record2AndOut::from((record_1, RecordIn2 {}));
+
+    assert_eq!(datum_a, 42);
 
     assert_eq!(*record_2.datum_b(), 12);
     assert_eq!(*record_2.datum_c(), 3);
 
     let record_3 = Record3::from((
         record_2,
-        ToRecord3 {
+        RecordIn3 {
             datum_d: 4,
             datum_e: 5,
             datum_f: 6,
@@ -81,7 +86,7 @@ fn main() {
 
     let record_4 = Record4::from((
         record_3,
-        ToRecord4 {
+        RecordIn4 {
             machin_enum: MachinEnum::Text("Foo".to_string()),
         },
     ));
