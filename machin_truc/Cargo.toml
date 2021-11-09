@@ -1,0 +1,12 @@
+[package]
+name = "machin_truc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+truc_runtime = { path = "../truc_runtime" }
+machin_data = { path = "../machin_data" }
+
+[build-dependencies]
+machin_data = { path = "../machin_data" }
+truc = { path = "../truc" }

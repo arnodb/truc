@@ -72,8 +72,8 @@ impl RecordVariant {
         self.id
     }
 
-    pub fn data(&self) -> &[DatumId] {
-        &self.data
+    pub fn data(&self) -> impl Iterator<Item = DatumId> + '_ {
+        self.data.iter().copied()
     }
 
     fn fmt_representation(
