@@ -6,6 +6,7 @@ pub struct DatumId(usize);
 #[derive(Debug, new)]
 pub struct DatumDefinition {
     id: DatumId,
+    name: String,
     offset: usize,
     size: usize,
     type_name: &'static str,
@@ -14,6 +15,10 @@ pub struct DatumDefinition {
 impl DatumDefinition {
     pub fn id(&self) -> DatumId {
         self.id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn offset(&self) -> usize {
@@ -50,9 +55,15 @@ impl DatumDefinitionCollection {
         self.data.get(id.0)
     }
 
-    fn push(&mut self, offset: usize, size: usize, type_name: &'static str) -> DatumId {
+    fn push(
+        &mut self,
+        name: String,
+        offset: usize,
+        size: usize,
+        type_name: &'static str,
+    ) -> DatumId {
         let id = DatumId::from(self.data.len());
-        let datum = DatumDefinition::new(id, offset, size, type_name);
+        let datum = DatumDefinition::new(id, name, offset, size, type_name);
         self.data.push(datum);
         id
     }
@@ -180,7 +191,14 @@ impl RecordVariantBuilder {
         }
     }
 
-    fn add_datum<T>(&mut self, datum_definitions: &mut DatumDefinitionCollection) -> DatumId {
+    fn add_datum<T, N>(
+        &mut self,
+        datum_definitions: &mut DatumDefinitionCollection,
+        name: N,
+    ) -> DatumId
+    where
+        N: Into<String>,
+    {
         let size = std::mem::size_of::<T>();
         let mut data_carret = self.data_carret;
         let mut byte_carret = self.byte_carret;
@@ -201,7 +219,7 @@ impl RecordVariantBuilder {
         }
 
         let type_name = std::any::type_name::<T>();
-        let datum_id = datum_definitions.push(byte_carret, size, type_name);
+        let datum_id = datum_definitions.push(name.into(), byte_carret, size, type_name);
         self.data.insert(data_carret, datum_id);
         datum_id
     }
@@ -244,10 +262,13 @@ impl RecordDefinitionBuilder {
         }
     }
 
-    pub fn add_datum<T>(&mut self) -> DatumId {
+    pub fn add_datum<T, N>(&mut self, name: N) -> DatumId
+    where
+        N: Into<String>,
+    {
         let id = self
             .current_variant
-            .add_datum::<T>(&mut self.datum_definitions);
+            .add_datum::<T, N>(&mut self.datum_definitions, name);
         self.variant_dirty = true;
         id
     }

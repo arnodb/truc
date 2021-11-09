@@ -51,14 +51,14 @@ pub fn generate<W: Write>(
 
         let new_fn = record_impl.new_fn("new").vis("pub").ret("Self");
         for datum in &data {
-            new_fn.arg(&format!("datum_{}", datum.id()), datum.type_name());
+            new_fn.arg(datum.name(), datum.type_name());
         }
         new_fn.line("let mut data = RecordMaybeUninit::new();");
         for datum in &data {
             new_fn.line(format!(
-                "unsafe {{ data.write({}, datum_{}); }}",
+                "unsafe {{ data.write({}, {}); }}",
                 datum.offset(),
-                datum.id()
+                datum.name()
             ));
         }
         new_fn.line("Self { data }");
@@ -72,8 +72,8 @@ pub fn generate<W: Write>(
         let drop_fn = drop_impl.new_fn("drop").arg_mut_self();
         for datum in &data {
             drop_fn.line(format!(
-                "let _datum{}: {} = unsafe {{ self.data.read({}) }};",
-                datum.id(),
+                "let _{}: {} = unsafe {{ self.data.read({}) }};",
+                datum.name(),
                 datum.type_name(),
                 datum.offset(),
             ));
