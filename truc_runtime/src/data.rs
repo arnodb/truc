@@ -11,6 +11,16 @@ impl<const CAP: usize> RecordMaybeUninit<CAP> {
         }
     }
 
+    /// Reads an object of type `T` back from the record at offset `offset`.
+    ///
+    /// # Safety
+    ///
+    /// This function should not be called by anything but truc-generated code. It is used to put
+    /// data written by [`Self::write`] back in a droppable state.
+    pub unsafe fn read<T>(&self, offset: usize) -> T {
+        std::ptr::read((self.data.as_ptr().add(offset) as *const u8).cast())
+    }
+
     /// Stores an object of type `T` in the record at offset `offset`.
     ///
     /// # Safety
@@ -21,14 +31,22 @@ impl<const CAP: usize> RecordMaybeUninit<CAP> {
         std::ptr::write((self.data.as_ptr().add(offset) as *mut u8).cast(), t);
     }
 
-    /// Reads an object of type `T`back from the record at offset `offset`.
+    /// Gets a reference to object of type `T` from the record at offset `offset`.
     ///
     /// # Safety
     ///
-    /// This function should not be called by anything but truc-generated code. It is used to put
-    /// data written by [`Self::write`] back in a droppable state.
-    pub unsafe fn read<T>(&self, offset: usize) -> T {
-        std::ptr::read((self.data.as_ptr().add(offset) as *mut u8).cast())
+    /// This function should not be called by anything but truc-generated code.
+    pub unsafe fn get<T>(&self, offset: usize) -> &T {
+        &*(self.data.as_ptr().add(offset) as *mut u8).cast()
+    }
+
+    /// Gets a mutable reference to object of type `T` from the record at offset `offset`.
+    ///
+    /// # Safety
+    ///
+    /// This function should not be called by anything but truc-generated code.
+    pub unsafe fn get_mut<T>(&mut self, offset: usize) -> &mut T {
+        &mut *(self.data.as_ptr().add(offset) as *mut u8).cast()
     }
 }
 

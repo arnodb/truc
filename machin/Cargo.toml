@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+assert_matches = "1.5"
 machin_data = { path = "../machin_data" }
 machin_truc = { path = "../machin_truc" }

@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum MachinEnum {
     Number(usize),
     Text(String),
