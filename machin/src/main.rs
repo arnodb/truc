@@ -10,7 +10,7 @@ fn main() {
         datum_f: 0b_1000_1000_1000_1000_1000_1000_1000_1000,
         machin_enum: MachinEnum::Number(42 * 1000 * 1000 * 1000),
     });
-    let _record4 = Record4::<MAX_SIZE>::new(NewRecord4 {
+    let _record4 = Record4::<MAX_SIZE>::from(NewRecord4 {
         datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,
         datum_c: 0b_0100_0100_0100_0100_0100_0100_0100_0100,
         datum_d: 0b_0101_0101,

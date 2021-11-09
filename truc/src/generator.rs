@@ -51,6 +51,7 @@ pub fn generate<W: Write>(
 
         generate_record_impl(&data, &record_name, &constructor_record_name, &mut scope);
         generate_drop_impl(&record_name, &data, &mut scope);
+        generate_from_constructor_record_impl(&record_name, &constructor_record_name, &mut scope);
     }
 
     write!(output, "{}", scope.to_string())?;
@@ -108,6 +109,24 @@ fn generate_drop_impl(record_name: &str, data: &[&DatumDefinition], scope: &mut 
             datum.offset(),
         ));
     }
+}
+
+fn generate_from_constructor_record_impl(
+    record_name: &str,
+    constructor_record_name: &str,
+    scope: &mut Scope,
+) {
+    let from_impl = scope
+        .new_impl(record_name)
+        .generic(CAP_GENERIC)
+        .target_generic(CAP)
+        .impl_trait(format!("From<{}>", constructor_record_name));
+
+    let from_fn = from_impl
+        .new_fn("from")
+        .arg("from", constructor_record_name)
+        .ret("Self");
+    from_fn.line("Self::new(from)");
 }
 
 fn generate_data_record(record_name: &str, data: &[&DatumDefinition], scope: &mut Scope) {
