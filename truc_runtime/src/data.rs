@@ -27,7 +27,7 @@ impl<const CAP: usize> RecordMaybeUninit<CAP> {
     ///
     /// This function should not be called by anything but truc-generated code. It is used to put
     /// data written by [`Self::write`] back in a droppable state.
-    pub unsafe fn read<T>(&mut self, offset: usize) -> T {
+    pub unsafe fn read<T>(&self, offset: usize) -> T {
         std::ptr::read((self.data.as_ptr().add(offset) as *mut u8).cast())
     }
 }

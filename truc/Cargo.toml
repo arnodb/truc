@@ -7,4 +7,5 @@ edition = "2021"
 codegen = "0.1"
 derive_more = "0.99"
 derive-new = "0.5"
+itertools = "0.10"
 truc_runtime = { path = "../truc_runtime" }
