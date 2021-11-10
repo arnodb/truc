@@ -23,13 +23,28 @@ pub fn generate<W: Write>(
         .max()
         .unwrap_or(0);
 
-    scope.raw(&format!("pub const MAX_SIZE: usize = {};", max_size));
+    scope.raw(&format!(
+        r#"/// Maximum size of the record, regardless of the record variant.
+///
+/// Use that value, or a greater value, as the `CAP` const generic of every record.
+pub const MAX_SIZE: usize = {};"#,
+        max_size
+    ));
 
     let record_uninit = scope
         .new_struct("RecordUninitialized")
         .vis("pub")
         .generic(CAP_GENERIC);
     record_uninit.field("_data", &uninit_type);
+    record_uninit.doc(
+        r#"Uninitialized record.
+
+It will never drop any data except the container by itself.
+
+# Intention
+
+This is to be used in custom allocators."#,
+    );
 
     let mut prev_variant = None::<(&RecordVariant, String)>;
 
@@ -46,19 +61,43 @@ pub fn generate<W: Write>(
         let uninit_safe_constructor_record_name = format!("NewRecordUninitSafe{}", variant.id());
 
         generate_data_record(
-            &constructor_record_name,
+            RecordInfo {
+                name: &constructor_record_name,
+                public: true,
+                doc: Some(
+                    r#"Data container for simple construction.
+
+All the fields are named for the safe interoperability between the generated code and the code
+using it."#,
+                ),
+            },
             &data,
             UninitKind::False,
             &mut scope,
         );
         generate_data_record(
-            &uninit_constructor_record_name,
+            RecordInfo {
+                name: &uninit_constructor_record_name,
+                public: true,
+                doc: Some(
+                    r#"Data container for simple construction without the data to be left uninitialized.
+
+All the fields are named for the safe interoperability between the generated code and the code
+using it."#,
+                ),
+            },
             &data,
             UninitKind::Unsafe,
             &mut scope,
         );
         let uninit_constructor_record_generic = generate_data_record(
-            &uninit_safe_constructor_record_name,
+            RecordInfo {
+                name: &uninit_safe_constructor_record_name,
+                public: false,
+                doc: Some(
+                    r#"It only exists to check that the uninitialized data is actually [`Copy`] at run time."#,
+                ),
+            },
             &data,
             UninitKind::Safe {
                 unsafe_record_name: &uninit_constructor_record_name,
@@ -76,6 +115,24 @@ pub fn generate<W: Write>(
             .vis("pub")
             .generic(CAP_GENERIC);
         record.field("data", &uninit_type);
+        if let Some((prev_variant, _)) = prev_variant {
+            record.doc(&format!(
+                r#"Record variant #{}.
+
+It may be converted from a [`Record{}`] via one of the various call to [`From::from`]
+
+It may also be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)"#,
+                variant.id(),
+                prev_variant.id()
+            ));
+        } else {
+            record.doc(&format!(
+                r#"Record variant #{}.
+
+It may be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)"#,
+                variant.id()
+            ));
+        }
 
         generate_record_impl(
             RecordImplRecordNames {
@@ -122,15 +179,40 @@ pub fn generate<W: Write>(
             let uninit_safe_plus_record_name = format!("RecordInUninitSafe{}", variant.id());
             let and_out_record_name = format!("Record{}AndOut", variant.id());
 
-            generate_data_record(&plus_record_name, &plus_data, UninitKind::False, &mut scope);
             generate_data_record(
-                &uninit_plus_record_name,
+                RecordInfo {
+                    name: &plus_record_name,
+                    public: true,
+                    doc: Some(&format!(
+                        r#"Data container for conversion from [`Record{}`]."#,
+                        prev_variant.id()
+                    )),
+                },
+                &plus_data,
+                UninitKind::False,
+                &mut scope,
+            );
+            generate_data_record(
+                RecordInfo {
+                    name: &uninit_plus_record_name,
+                    public: true,
+                    doc: Some(&format!(
+                        r#"Data container for conversion from [`Record{}`] without the data to be left uninitialized."#,
+                        prev_variant.id()
+                    )),
+                },
                 &plus_data,
                 UninitKind::Unsafe,
                 &mut scope,
             );
             let uninit_plus_record_generic = generate_data_record(
-                &uninit_safe_plus_record_name,
+                RecordInfo {
+                    name: &uninit_safe_plus_record_name,
+                    public: false,
+                    doc: Some(
+                        r#"It only exists to check that the uninitialized data is actually [`Copy`] at run time."#,
+                    ),
+                },
                 &plus_data,
                 UninitKind::Safe {
                     unsafe_record_name: &uninit_plus_record_name,
@@ -143,7 +225,22 @@ pub fn generate<W: Write>(
                 record_generic: &uninit_plus_record_generic,
             };
 
-            generate_data_out_record(&and_out_record_name, &record_name, &minus_data, &mut scope);
+            generate_data_out_record(
+                RecordInfo {
+                    name: &and_out_record_name,
+                    public: true,
+                    doc: Some(&format!(
+                        r#"Result of conversion from record variant #{} to variant #{} via a [`From::from`] call.
+
+It contains all the removed data so that one can still use them, or drop them."#,
+                        prev_variant.id(),
+                        variant.id()
+                    )),
+                },
+                &record_name,
+                &minus_data,
+                &mut scope,
+            );
 
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
@@ -483,13 +580,22 @@ struct RecordGeneric {
     typed: String,
 }
 
+struct RecordInfo<'a> {
+    name: &'a str,
+    public: bool,
+    doc: Option<&'a str>,
+}
+
 fn generate_data_record(
-    record_name: &str,
+    record_info: RecordInfo,
     data: &[&DatumDefinition],
     uninit: UninitKind,
     scope: &mut Scope,
 ) -> Option<RecordGeneric> {
-    let record = scope.new_struct(record_name).vis("pub");
+    let record = scope.new_struct(record_info.name);
+    if record_info.public {
+        record.vis("pub");
+    }
 
     let (generic, uninit_has_data) = match &uninit {
         UninitKind::Safe { .. } => {
@@ -545,8 +651,12 @@ fn generate_data_record(
         }
     }
 
+    if let Some(doc) = record_info.doc {
+        record.doc(doc);
+    }
+
     if let UninitKind::Safe { unsafe_record_name } = uninit {
-        let from_impl = scope.new_impl(record_name);
+        let from_impl = scope.new_impl(record_info.name);
         if let Some(generic) = &generic {
             from_impl
                 .generic(&generic.full)
@@ -577,13 +687,13 @@ fn generate_data_record(
 }
 
 fn generate_data_out_record(
-    record_name: &str,
+    record_info: RecordInfo,
     inside_record_name: &str,
     data: &[&DatumDefinition],
     scope: &mut Scope,
 ) {
     let record = scope
-        .new_struct(record_name)
+        .new_struct(record_info.name)
         .vis("pub")
         .generic(CAP_GENERIC);
 
@@ -593,5 +703,9 @@ fn generate_data_out_record(
 
     for datum in data {
         record.field(&format!("pub {}", datum.name()), datum.type_name());
+    }
+
+    if let Some(doc) = record_info.doc {
+        record.doc(doc);
     }
 }
