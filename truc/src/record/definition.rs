@@ -10,6 +10,7 @@ pub struct DatumDefinition {
     offset: usize,
     size: usize,
     type_name: &'static str,
+    allow_uninit: bool,
 }
 
 impl DatumDefinition {
@@ -31,6 +32,10 @@ impl DatumDefinition {
 
     pub fn type_name(&self) -> &'static str {
         self.type_name
+    }
+
+    pub fn allow_uninit(&self) -> bool {
+        self.allow_uninit
     }
 }
 
@@ -61,9 +66,10 @@ impl DatumDefinitionCollection {
         offset: usize,
         size: usize,
         type_name: &'static str,
+        allow_uninit: bool,
     ) -> DatumId {
         let id = DatumId::from(self.data.len());
-        let datum = DatumDefinition::new(id, name, offset, size, type_name);
+        let datum = DatumDefinition::new(id, name, offset, size, type_name, allow_uninit);
         self.data.push(datum);
         id
     }
@@ -199,6 +205,30 @@ impl RecordVariantBuilder {
     where
         N: Into<String>,
     {
+        self.add_datum_internal::<T, N>(datum_definitions, name, false)
+    }
+
+    fn add_datum_allow_uninit<T, N>(
+        &mut self,
+        datum_definitions: &mut DatumDefinitionCollection,
+        name: N,
+    ) -> DatumId
+    where
+        T: Copy,
+        N: Into<String>,
+    {
+        self.add_datum_internal::<T, N>(datum_definitions, name, true)
+    }
+
+    fn add_datum_internal<T, N>(
+        &mut self,
+        datum_definitions: &mut DatumDefinitionCollection,
+        name: N,
+        allow_uninit: bool,
+    ) -> DatumId
+    where
+        N: Into<String>,
+    {
         let size = std::mem::size_of::<T>();
         let mut data_carret = self.data_carret;
         let mut byte_carret = self.byte_carret;
@@ -219,7 +249,8 @@ impl RecordVariantBuilder {
         }
 
         let type_name = std::any::type_name::<T>();
-        let datum_id = datum_definitions.push(name.into(), byte_carret, size, type_name);
+        let datum_id =
+            datum_definitions.push(name.into(), byte_carret, size, type_name, allow_uninit);
         self.data.insert(data_carret, datum_id);
         datum_id
     }
@@ -269,6 +300,18 @@ impl RecordDefinitionBuilder {
         let id = self
             .current_variant
             .add_datum::<T, N>(&mut self.datum_definitions, name);
+        self.variant_dirty = true;
+        id
+    }
+
+    pub fn add_datum_allow_uninit<T, N>(&mut self, name: N) -> DatumId
+    where
+        T: Copy,
+        N: Into<String>,
+    {
+        let id = self
+            .current_variant
+            .add_datum_allow_uninit::<T, N>(&mut self.datum_definitions, name);
         self.variant_dirty = true;
         id
     }

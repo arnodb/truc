@@ -21,14 +21,15 @@ fn main() {
     assert_eq!(*record_4.datum_f(), 0x88888888);
     assert_matches!(record_4.machin_enum(), &MachinEnum::Number(42000000000));
 
-    let record_4 = Record4::<MAX_SIZE>::from(NewRecord4 {
-        datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,
-        datum_c: 0b_0100_0100_0100_0100_0100_0100_0100_0100,
-        datum_d: 0b_0101_0101,
-        datum_e: 0b_0001_0001_0001_0001,
-        datum_f: 0b_1000_1000_1000_1000_1000_1000_1000_1000,
+    let mut record_4 = Record4::<MAX_SIZE>::from(NewRecordUninit4 {
         machin_enum: MachinEnum::Text("Hello World!".to_string()),
     });
+
+    *record_4.datum_b_mut() = 0b_0010_0010_0010_0010_0010_0010_0010_0010;
+    *record_4.datum_c_mut() = 0b_0100_0100_0100_0100_0100_0100_0100_0100;
+    *record_4.datum_d_mut() = 0b_0101_0101;
+    *record_4.datum_e_mut() = 0b_0001_0001_0001_0001;
+    *record_4.datum_f_mut() = 0b_1000_1000_1000_1000_1000_1000_1000_1000;
 
     assert_eq!(*record_4.datum_b(), 0x22222222);
     assert_eq!(*record_4.datum_c(), 0x44444444);
