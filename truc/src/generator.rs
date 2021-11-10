@@ -78,22 +78,28 @@ pub fn generate<W: Write>(
         record.field("data", &uninit_type);
 
         generate_record_impl(
-            &data,
-            &record_name,
-            &constructor_record_name,
+            RecordImplRecordNames {
+                name: &record_name,
+                constructor: &constructor_record_name,
+            },
             &constructor_uninit_info,
+            &data,
             &mut scope,
         );
         generate_drop_impl(&record_name, &data, &mut scope);
         generate_from_constructor_record_impl(
-            &record_name,
-            &constructor_record_name,
+            RecordImplRecordNames {
+                name: &record_name,
+                constructor: &constructor_record_name,
+            },
             false,
             &mut scope,
         );
         generate_from_constructor_record_impl(
-            &record_name,
-            &uninit_constructor_record_name,
+            RecordImplRecordNames {
+                name: &record_name,
+                constructor: &uninit_constructor_record_name,
+            },
             true,
             &mut scope,
         );
@@ -140,31 +146,53 @@ pub fn generate<W: Write>(
             generate_data_out_record(&and_out_record_name, &record_name, &minus_data, &mut scope);
 
             generate_from_previous_record_impl(
-                &record_name,
-                &prev_record_name,
-                &plus_record_name,
+                RecordFromPreviousRecordNames {
+                    name: &record_name,
+                    prev: &prev_record_name,
+                    plus: &plus_record_name,
+                    and_out: None,
+                },
                 None,
                 &minus_data,
                 &plus_data,
                 &mut scope,
             );
             generate_from_previous_record_impl(
-                &record_name,
-                &prev_record_name,
-                &uninit_plus_record_name,
+                RecordFromPreviousRecordNames {
+                    name: &record_name,
+                    prev: &prev_record_name,
+                    plus: &uninit_plus_record_name,
+                    and_out: None,
+                },
                 Some(&plus_uninit_info),
                 &minus_data,
                 &plus_data,
                 &mut scope,
             );
 
-            generate_from_previous_record_minus_impl(
-                &record_name,
-                &prev_record_name,
-                &plus_record_name,
+            generate_from_previous_record_impl(
+                RecordFromPreviousRecordNames {
+                    name: &record_name,
+                    prev: &prev_record_name,
+                    plus: &plus_record_name,
+                    and_out: Some(&and_out_record_name),
+                },
+                None,
                 &minus_data,
                 &plus_data,
-                &and_out_record_name,
+                &mut scope,
+            );
+
+            generate_from_previous_record_impl(
+                RecordFromPreviousRecordNames {
+                    name: &record_name,
+                    prev: &prev_record_name,
+                    plus: &uninit_plus_record_name,
+                    and_out: Some(&and_out_record_name),
+                },
+                Some(&plus_uninit_info),
+                &minus_data,
+                &plus_data,
                 &mut scope,
             );
         }
@@ -176,19 +204,23 @@ pub fn generate<W: Write>(
     Ok(())
 }
 
+struct RecordImplRecordNames<'a> {
+    name: &'a str,
+    constructor: &'a str,
+}
+
 fn generate_record_impl(
-    data: &[&DatumDefinition],
-    record_name: &str,
-    constructor_record_name: &str,
+    record_names: RecordImplRecordNames,
     uninit_info: &UninitInfo,
+    data: &[&DatumDefinition],
     scope: &mut Scope,
 ) {
     let record_impl = scope
-        .new_impl(record_name)
+        .new_impl(record_names.name)
         .generic(CAP_GENERIC)
         .target_generic(CAP);
 
-    generate_constructor(data, constructor_record_name, None, record_impl);
+    generate_constructor(data, record_names.constructor, None, record_impl);
     generate_constructor(
         data,
         uninit_info.record_name,
@@ -272,7 +304,7 @@ fn generate_constructor(
     }
     new_fn.line(format!(
         "let {}data = RecordMaybeUninit::new();",
-        if !uninit.is_some() && has_data || uninit.is_some() && uninit_has_data {
+        if uninit.is_none() && has_data || uninit.is_some() && uninit_has_data {
             "mut "
         } else {
             ""
@@ -310,20 +342,19 @@ fn generate_drop_impl(record_name: &str, data: &[&DatumDefinition], scope: &mut 
 }
 
 fn generate_from_constructor_record_impl(
-    record_name: &str,
-    constructor_record_name: &str,
+    record_names: RecordImplRecordNames,
     uninit: bool,
     scope: &mut Scope,
 ) {
     let from_impl = scope
-        .new_impl(record_name)
+        .new_impl(record_names.name)
         .generic(CAP_GENERIC)
         .target_generic(CAP)
-        .impl_trait(format!("From<{}>", constructor_record_name));
+        .impl_trait(format!("From<{}>", record_names.constructor));
 
     let from_fn = from_impl
         .new_fn("from")
-        .arg("from", constructor_record_name)
+        .arg("from", record_names.constructor)
         .ret("Self");
     from_fn.line(format!(
         "Self::{}(from)",
@@ -331,18 +362,23 @@ fn generate_from_constructor_record_impl(
     ));
 }
 
+struct RecordFromPreviousRecordNames<'a> {
+    name: &'a str,
+    prev: &'a str,
+    plus: &'a str,
+    and_out: Option<&'a str>,
+}
+
 fn generate_from_previous_record_impl(
-    record_name: &str,
-    prev_record_name: &str,
-    plus_record_name: &str,
+    record_names: RecordFromPreviousRecordNames,
     uninit: Option<&UninitInfo>,
     minus_data: &[&DatumDefinition],
     plus_data: &[&DatumDefinition],
     scope: &mut Scope,
 ) {
-    let from_type = format!("({}<{}>, {})", prev_record_name, CAP, plus_record_name);
+    let from_type = format!("({}<{}>, {})", record_names.prev, CAP, record_names.plus);
     let from_impl = scope
-        .new_impl(record_name)
+        .new_impl(record_names.and_out.unwrap_or(record_names.name))
         .generic(CAP_GENERIC)
         .target_generic(CAP)
         .impl_trait(format!("From<{}>", from_type));
@@ -372,7 +408,12 @@ fn generate_from_previous_record_impl(
 
     for datum in minus_data {
         from_fn.line(format!(
-            "let _{}: {} = unsafe {{ from.data.read({}) }};",
+            "let {}{}: {} = unsafe {{ from.data.read({}) }};",
+            if record_names.and_out.is_some() {
+                ""
+            } else {
+                "_"
+            },
             datum.name(),
             datum.type_name(),
             datum.offset(),
@@ -397,7 +438,7 @@ fn generate_from_previous_record_impl(
     from_fn.line("let manually_drop = std::mem::ManuallyDrop::new(from);");
     from_fn.line(format!(
         "let {}data = unsafe {{ std::ptr::read(&(*manually_drop).data) }};",
-        if !uninit.is_some() && plus_has_data || uninit.is_some() && uninit_plus_has_data {
+        if uninit.is_none() && plus_has_data || uninit.is_some() && uninit_plus_has_data {
             "mut "
         } else {
             ""
@@ -414,67 +455,19 @@ fn generate_from_previous_record_impl(
             datum.name(),
         ));
     }
-    from_fn.line("Self { data }");
-}
-
-fn generate_from_previous_record_minus_impl(
-    record_name: &str,
-    prev_record_name: &str,
-    plus_record_name: &str,
-    minus_data: &[&DatumDefinition],
-    plus_data: &[&DatumDefinition],
-    and_out_record_name: &str,
-    scope: &mut Scope,
-) {
-    let from_type = format!("({}<{}>, {})", prev_record_name, CAP, plus_record_name);
-    let from_impl = scope
-        .new_impl(and_out_record_name)
-        .generic(CAP_GENERIC)
-        .target_generic(CAP)
-        .impl_trait(format!("From<{}>", from_type));
-
-    let from_fn = from_impl
-        .new_fn("from")
-        .arg(
-            &format!(
-                "(from, {}plus)",
-                if plus_data.is_empty() { "_" } else { "" }
-            ),
-            from_type,
-        )
-        .ret("Self");
-
-    for datum in minus_data {
+    if let Some(and_out_record_name) = record_names.and_out {
+        from_fn.line(format!("let record = {} {{ data }};", record_names.name));
         from_fn.line(format!(
-            "let {}: {} = unsafe {{ from.data.read({}) }};",
-            datum.name(),
-            datum.type_name(),
-            datum.offset(),
+            "{} {{ record{} }}",
+            and_out_record_name,
+            minus_data
+                .iter()
+                .flat_map(|datum| [", ", datum.name()])
+                .collect::<String>()
         ));
+    } else {
+        from_fn.line("Self { data }");
     }
-
-    from_fn.line("let manually_drop = std::mem::ManuallyDrop::new(from);");
-    from_fn.line(format!(
-        "let {}data = unsafe {{ std::ptr::read(&(*manually_drop).data) }};",
-        if plus_data.is_empty() { "" } else { "mut " }
-    ));
-
-    for datum in plus_data {
-        from_fn.line(format!(
-            "unsafe {{ data.write({}, plus.{}); }}",
-            datum.offset(),
-            datum.name(),
-        ));
-    }
-    from_fn.line(format!("let record = {} {{ data }};", record_name));
-    from_fn.line(format!(
-        "{} {{ record{} }}",
-        and_out_record_name,
-        minus_data
-            .iter()
-            .flat_map(|datum| [", ", datum.name()])
-            .collect::<String>()
-    ));
 }
 
 #[derive(Debug, PartialEq, Eq)]
