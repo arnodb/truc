@@ -61,10 +61,15 @@ pub fn generate<W: Write>(
             &uninit_safe_constructor_record_name,
             &data,
             UninitKind::Safe {
-                unsafe_record_name: uninit_constructor_record_name.clone(),
+                unsafe_record_name: &uninit_constructor_record_name,
             },
             &mut scope,
         );
+        let constructor_uninit_info = UninitInfo {
+            record_name: &uninit_constructor_record_name,
+            safe_record_name: &uninit_safe_constructor_record_name,
+            record_generic: &uninit_constructor_record_generic,
+        };
 
         let record = scope
             .new_struct(&record_name)
@@ -76,8 +81,7 @@ pub fn generate<W: Write>(
             &data,
             &record_name,
             &constructor_record_name,
-            &uninit_safe_constructor_record_name,
-            &uninit_constructor_record_generic,
+            &constructor_uninit_info,
             &mut scope,
         );
         generate_drop_impl(&record_name, &data, &mut scope);
@@ -85,14 +89,12 @@ pub fn generate<W: Write>(
             &record_name,
             &constructor_record_name,
             false,
-            &uninit_safe_constructor_record_name,
             &mut scope,
         );
         generate_from_constructor_record_impl(
             &record_name,
             &uninit_constructor_record_name,
             true,
-            &uninit_safe_constructor_record_name,
             &mut scope,
         );
         if let Some((prev_variant, prev_record_name)) = prev_variant {
@@ -110,15 +112,47 @@ pub fn generate<W: Write>(
                 .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e);
 
             let plus_record_name = format!("RecordIn{}", variant.id());
+            let uninit_plus_record_name = format!("RecordInUninit{}", variant.id());
+            let uninit_safe_plus_record_name = format!("RecordInUninitSafe{}", variant.id());
             let and_out_record_name = format!("Record{}AndOut", variant.id());
 
             generate_data_record(&plus_record_name, &plus_data, UninitKind::False, &mut scope);
+            generate_data_record(
+                &uninit_plus_record_name,
+                &plus_data,
+                UninitKind::Unsafe,
+                &mut scope,
+            );
+            let uninit_plus_record_generic = generate_data_record(
+                &uninit_safe_plus_record_name,
+                &plus_data,
+                UninitKind::Safe {
+                    unsafe_record_name: &uninit_plus_record_name,
+                },
+                &mut scope,
+            );
+            let plus_uninit_info = UninitInfo {
+                record_name: &uninit_plus_record_name,
+                safe_record_name: &uninit_safe_plus_record_name,
+                record_generic: &uninit_plus_record_generic,
+            };
+
             generate_data_out_record(&and_out_record_name, &record_name, &minus_data, &mut scope);
 
             generate_from_previous_record_impl(
                 &record_name,
                 &prev_record_name,
                 &plus_record_name,
+                None,
+                &minus_data,
+                &plus_data,
+                &mut scope,
+            );
+            generate_from_previous_record_impl(
+                &record_name,
+                &prev_record_name,
+                &uninit_plus_record_name,
+                Some(&plus_uninit_info),
                 &minus_data,
                 &plus_data,
                 &mut scope,
@@ -146,8 +180,7 @@ fn generate_record_impl(
     data: &[&DatumDefinition],
     record_name: &str,
     constructor_record_name: &str,
-    uninit_safe_constructor_record_name: &str,
-    uninit_constructor_record_generic: &Option<RecordGeneric>,
+    uninit_info: &UninitInfo,
     scope: &mut Scope,
 ) {
     let record_impl = scope
@@ -155,12 +188,11 @@ fn generate_record_impl(
         .generic(CAP_GENERIC)
         .target_generic(CAP);
 
-    generate_constructor(data, constructor_record_name, false, &None, record_impl);
+    generate_constructor(data, constructor_record_name, None, record_impl);
     generate_constructor(
         data,
-        uninit_safe_constructor_record_name,
-        true,
-        uninit_constructor_record_generic,
+        uninit_info.record_name,
+        Some(uninit_info),
         record_impl,
     );
 
@@ -189,34 +221,67 @@ fn generate_record_impl(
     }
 }
 
+struct UninitInfo<'a> {
+    record_name: &'a str,
+    safe_record_name: &'a str,
+    record_generic: &'a Option<RecordGeneric>,
+}
+
 fn generate_constructor(
     data: &[&DatumDefinition],
     constructor_record_name: &str,
-    uninit: bool,
-    uninit_constructor_record_generic: &Option<RecordGeneric>,
+    uninit: Option<&UninitInfo>,
     record_impl: &mut Impl,
 ) {
-    let mut filtered_data = data
-        .iter()
-        .filter(|datum| !uninit || !datum.allow_uninit())
-        .peekable();
-    let unused_from = filtered_data.peek().is_none();
-    let from_type = match (uninit, uninit_constructor_record_generic) {
-        (true, Some(generic)) => {
-            format!("{}<{}>", constructor_record_name, generic.typed)
-        }
-        (true, None) | (false, _) => constructor_record_name.to_string(),
+    let (has_data, uninit_has_data) = {
+        (
+            !data.is_empty(),
+            if uninit.is_some() {
+                data.iter().any(|datum| !datum.allow_uninit())
+            } else {
+                false
+            },
+        )
     };
     let new_fn = record_impl
-        .new_fn(if !uninit { "new" } else { "new_uninit" })
+        .new_fn(if uninit.is_none() {
+            "new"
+        } else {
+            "new_uninit"
+        })
         .vis("pub")
-        .arg(if !unused_from { "from" } else { "_from" }, from_type)
+        .arg(
+            if uninit.is_some() || has_data {
+                "from"
+            } else {
+                "_from"
+            },
+            constructor_record_name,
+        )
         .ret("Self");
+    if let Some(uninit) = uninit {
+        new_fn.line(format!(
+            "let {} = {}{}::from(from);",
+            if uninit_has_data { "from" } else { "_from" },
+            uninit.safe_record_name,
+            uninit
+                .record_generic
+                .as_ref()
+                .map_or_else(String::new, |generic| format!("::<{}>", generic.typed))
+        ));
+    }
     new_fn.line(format!(
-        "let {} data = RecordMaybeUninit::new();",
-        if !unused_from { "mut" } else { "" }
+        "let {}data = RecordMaybeUninit::new();",
+        if !uninit.is_some() && has_data || uninit.is_some() && uninit_has_data {
+            "mut "
+        } else {
+            ""
+        }
     ));
-    for datum in filtered_data {
+    for datum in data
+        .iter()
+        .filter(|datum| uninit.is_none() || !datum.allow_uninit())
+    {
         new_fn.line(format!(
             "unsafe {{ data.write({}, from.{}); }}",
             datum.offset(),
@@ -248,7 +313,6 @@ fn generate_from_constructor_record_impl(
     record_name: &str,
     constructor_record_name: &str,
     uninit: bool,
-    uninit_safe_constructor_record_name: &str,
     scope: &mut Scope,
 ) {
     let from_impl = scope
@@ -261,24 +325,17 @@ fn generate_from_constructor_record_impl(
         .new_fn("from")
         .arg("from", constructor_record_name)
         .ret("Self");
-    if !uninit {
-        from_fn.line(format!(
-            "Self::{}(from)",
-            if !uninit { "new" } else { "new_uninit" },
-        ));
-    } else {
-        from_fn.line(format!(
-            "Self::{}({}::from(from))",
-            if !uninit { "new" } else { "new_uninit" },
-            uninit_safe_constructor_record_name
-        ));
-    }
+    from_fn.line(format!(
+        "Self::{}(from)",
+        if !uninit { "new" } else { "new_uninit" },
+    ));
 }
 
 fn generate_from_previous_record_impl(
     record_name: &str,
     prev_record_name: &str,
     plus_record_name: &str,
+    uninit: Option<&UninitInfo>,
     minus_data: &[&DatumDefinition],
     plus_data: &[&DatumDefinition],
     scope: &mut Scope,
@@ -290,13 +347,25 @@ fn generate_from_previous_record_impl(
         .target_generic(CAP)
         .impl_trait(format!("From<{}>", from_type));
 
+    let (plus_has_data, uninit_plus_has_data) = {
+        (
+            !plus_data.is_empty(),
+            if uninit.is_some() {
+                plus_data.iter().any(|datum| !datum.allow_uninit())
+            } else {
+                false
+            },
+        )
+    };
+
     let from_fn = from_impl
         .new_fn("from")
         .arg(
-            &format!(
-                "(from, {}plus)",
-                if plus_data.is_empty() { "_" } else { "" }
-            ),
+            if uninit.is_some() || plus_has_data {
+                "(from, plus)"
+            } else {
+                "(from, _plus)"
+            },
             from_type,
         )
         .ret("Self");
@@ -310,13 +379,35 @@ fn generate_from_previous_record_impl(
         ));
     }
 
+    if let Some(uninit) = uninit {
+        from_fn.line(format!(
+            "let {} = {}{}::from(plus);",
+            if uninit_plus_has_data {
+                "plus"
+            } else {
+                "_plus"
+            },
+            uninit.safe_record_name,
+            uninit
+                .record_generic
+                .as_ref()
+                .map_or_else(String::new, |generic| format!("::<{}>", generic.typed))
+        ));
+    }
     from_fn.line("let manually_drop = std::mem::ManuallyDrop::new(from);");
     from_fn.line(format!(
         "let {}data = unsafe {{ std::ptr::read(&(*manually_drop).data) }};",
-        if plus_data.is_empty() { "" } else { "mut " }
+        if !uninit.is_some() && plus_has_data || uninit.is_some() && uninit_plus_has_data {
+            "mut "
+        } else {
+            ""
+        }
     ));
 
-    for datum in plus_data {
+    for datum in plus_data
+        .iter()
+        .filter(|datum| uninit.is_none() || !datum.allow_uninit())
+    {
         from_fn.line(format!(
             "unsafe {{ data.write({}, plus.{}); }}",
             datum.offset(),
@@ -387,10 +478,10 @@ fn generate_from_previous_record_minus_impl(
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum UninitKind {
+enum UninitKind<'a> {
     False,
     Unsafe,
-    Safe { unsafe_record_name: String },
+    Safe { unsafe_record_name: &'a str },
 }
 
 struct RecordGeneric {
@@ -461,7 +552,7 @@ fn generate_data_record(
         }
     }
 
-    if let UninitKind::Safe { unsafe_record_name } = &uninit {
+    if let UninitKind::Safe { unsafe_record_name } = uninit {
         let from_impl = scope.new_impl(record_name);
         if let Some(generic) = &generic {
             from_impl
