@@ -8,22 +8,32 @@ use truc::record::definition::RecordDefinitionBuilder;
 fn main() {
     let mut definition = RecordDefinitionBuilder::new();
 
-    let a = definition.add_datum_allow_uninit::<u32, _>("datum_a");
-    let _b = definition.add_datum_allow_uninit::<u32, _>("datum_b");
+    let a0 = definition.add_datum_allow_uninit::<u32, _>("datum_a");
+    let b0 = definition.add_datum_allow_uninit::<u32, _>("datum_b");
     definition.close_record_variant();
 
-    let _c = definition.add_datum_allow_uninit::<u32, _>("datum_c");
+    let c1 = definition.add_datum_allow_uninit::<u32, _>("datum_c");
     definition.close_record_variant();
 
-    definition.remove_datum(a);
+    definition.remove_datum(a0);
     definition.close_record_variant();
 
-    let _d = definition.add_datum_allow_uninit::<u8, _>("datum_d");
-    let _e = definition.add_datum_allow_uninit::<u16, _>("datum_e");
-    let _f = definition.add_datum_allow_uninit::<u32, _>("datum_f");
+    let d3 = definition.add_datum_allow_uninit::<u8, _>("datum_d");
+    let e3 = definition.add_datum_allow_uninit::<u16, _>("datum_e");
+    let f3 = definition.add_datum_allow_uninit::<u32, _>("datum_f");
     definition.close_record_variant();
 
-    let _g = definition.add_datum::<MachinEnum, _>("machin_enum");
+    let machin_enum = definition.add_datum::<MachinEnum, _>("machin_enum");
+    definition.close_record_variant();
+
+    definition.remove_datum(b0);
+    definition.remove_datum(c1);
+    definition.remove_datum(d3);
+    definition.remove_datum(e3);
+    definition.remove_datum(f3);
+    definition.remove_datum(machin_enum);
+    let _datum_string = definition.add_datum::<String, _>("datum_string");
+    let _datum_array_of_strings = definition.add_datum::<[String; 2], _>("datum_array_of_strings");
 
     let definition = definition.build();
 

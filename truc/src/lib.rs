@@ -2,6 +2,8 @@
 extern crate derive_more;
 #[macro_use]
 extern crate derive_new;
+#[macro_use]
+extern crate quote;
 
 pub mod generator;
 pub mod record;

@@ -101,4 +101,18 @@ fn main() {
         record_4.machin_enum(),
         MachinEnum::Text(text) if text.as_str() == "Foo"
     );
+
+    let record_5 = Record5::from((
+        record_4,
+        RecordIn5 {
+            datum_string: "Hello".to_string(),
+            datum_array_of_strings: ["Hello".to_string(), "World".to_string()],
+        },
+    ));
+
+    assert_eq!(record_5.datum_string(), "Hello");
+    assert_eq!(
+        record_5.datum_array_of_strings(),
+        &["Hello".to_string(), "World".to_string()]
+    );
 }

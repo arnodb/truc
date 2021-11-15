@@ -1,3 +1,4 @@
+use crate::record::type_name::truc_type_name;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
@@ -9,7 +10,7 @@ pub struct DatumDefinition {
     name: String,
     offset: usize,
     size: usize,
-    type_name: &'static str,
+    type_name: String,
     allow_uninit: bool,
 }
 
@@ -30,8 +31,8 @@ impl DatumDefinition {
         self.size
     }
 
-    pub fn type_name(&self) -> &'static str {
-        self.type_name
+    pub fn type_name(&self) -> &str {
+        &self.type_name
     }
 
     pub fn allow_uninit(&self) -> bool {
@@ -65,7 +66,7 @@ impl DatumDefinitionCollection {
         name: String,
         offset: usize,
         size: usize,
-        type_name: &'static str,
+        type_name: String,
         allow_uninit: bool,
     ) -> DatumId {
         let id = DatumId::from(self.data.len());
@@ -248,7 +249,7 @@ impl RecordVariantBuilder {
             }
         }
 
-        let type_name = std::any::type_name::<T>();
+        let type_name = truc_type_name::<T>();
         let datum_id =
             datum_definitions.push(name.into(), byte_carret, size, type_name, allow_uninit);
         self.data.insert(data_carret, datum_id);
