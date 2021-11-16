@@ -1,7 +1,7 @@
 use crate::record::definition::{DatumDefinition, RecordDefinition, RecordVariant};
 use codegen::{Impl, Scope, Type};
 use itertools::{Either, EitherOrBoth, Itertools};
-use std::io::Write;
+use std::{collections::BTreeSet, io::Write};
 
 const CAP_GENERIC: &str = "const CAP: usize";
 const CAP: &str = "CAP";
@@ -48,6 +48,8 @@ This is to be used in custom allocators."#,
 
     let mut prev_variant = None::<(&RecordVariant, String)>;
 
+    let mut type_size_assertions = BTreeSet::new();
+
     for variant in definition.variants() {
         let data = variant
             .data()
@@ -59,6 +61,27 @@ This is to be used in custom allocators."#,
         let constructor_record_name = format!("NewRecord{}", variant.id());
         let uninit_constructor_record_name = format!("NewRecordUninit{}", variant.id());
         let uninit_safe_constructor_record_name = format!("NewRecordUninitSafe{}", variant.id());
+
+        let (minus_data, plus_data) = if let Some((prev_variant, _prev_record_name)) = &prev_variant
+        {
+            prev_variant
+                .data()
+                .sorted()
+                .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
+                .filter_map(|either| match either {
+                    EitherOrBoth::Left(left_id) => Some(Either::Left(
+                        definition.get_datum_definition(left_id).expect("datum"),
+                    )),
+                    EitherOrBoth::Right(right) => Some(Either::Right(right)),
+                    EitherOrBoth::Both(_, _) => None,
+                })
+                .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e)
+        } else {
+            (Vec::new(), data.clone())
+        };
+        for datum in &plus_data {
+            type_size_assertions.insert((datum.type_name(), datum.size()));
+        }
 
         generate_data_record(
             RecordInfo {
@@ -160,20 +183,7 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
             true,
             &mut scope,
         );
-        if let Some((prev_variant, prev_record_name)) = prev_variant {
-            let (minus_data, plus_data) = prev_variant
-                .data()
-                .sorted()
-                .merge_join_by(data, |left_id, right| left_id.cmp(&right.id()))
-                .filter_map(|either| match either {
-                    EitherOrBoth::Left(left_id) => Some(Either::Left(
-                        definition.get_datum_definition(left_id).expect("datum"),
-                    )),
-                    EitherOrBoth::Right(right) => Some(Either::Right(right)),
-                    EitherOrBoth::Both(_, _) => None,
-                })
-                .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e);
-
+        if let Some((prev_variant, prev_record_name)) = &prev_variant {
             let plus_record_name = format!("RecordIn{}", variant.id());
             let uninit_plus_record_name = format!("RecordInUninit{}", variant.id());
             let uninit_safe_plus_record_name = format!("RecordInUninitSafe{}", variant.id());
@@ -245,7 +255,7 @@ It contains all the removed data so that one can still use them, or drop them."#
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
                     name: &record_name,
-                    prev: &prev_record_name,
+                    prev: prev_record_name,
                     plus: &plus_record_name,
                     and_out: None,
                 },
@@ -257,7 +267,7 @@ It contains all the removed data so that one can still use them, or drop them."#
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
                     name: &record_name,
-                    prev: &prev_record_name,
+                    prev: prev_record_name,
                     plus: &uninit_plus_record_name,
                     and_out: None,
                 },
@@ -270,7 +280,7 @@ It contains all the removed data so that one can still use them, or drop them."#
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
                     name: &record_name,
-                    prev: &prev_record_name,
+                    prev: prev_record_name,
                     plus: &plus_record_name,
                     and_out: Some(&and_out_record_name),
                 },
@@ -283,7 +293,7 @@ It contains all the removed data so that one can still use them, or drop them."#
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
                     name: &record_name,
-                    prev: &prev_record_name,
+                    prev: prev_record_name,
                     plus: &uninit_plus_record_name,
                     and_out: Some(&and_out_record_name),
                 },
@@ -295,6 +305,15 @@ It contains all the removed data so that one can still use them, or drop them."#
         }
 
         prev_variant = Some((variant, record_name));
+    }
+
+    // This checks there is no type substitution which could lead to unsafe
+    // code due to different type size.
+    for (type_name, size) in type_size_assertions {
+        scope.raw(&format!(
+            "const_assert_eq!(std::mem::size_of::<{}>(), {});",
+            type_name, size
+        ));
     }
 
     write!(output, "{}", scope.to_string())?;

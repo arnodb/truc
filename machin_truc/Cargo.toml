@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-truc_runtime = { path = "../truc_runtime" }
 machin_data = { path = "../machin_data" }
+static_assertions = "1"
+truc_runtime = { path = "../truc_runtime" }
 
 [build-dependencies]
 machin_data = { path = "../machin_data" }
