@@ -10,5 +10,5 @@ derive-new = "0.5"
 itertools = "0.10"
 proc-macro2 = "1"
 quote = "1"
-syn = "1"
+syn = { version = "1", features = ["full"] }
 truc_runtime = { path = "../truc_runtime" }

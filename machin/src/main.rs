@@ -3,6 +3,8 @@ extern crate assert_matches;
 #[macro_use]
 extern crate derive_new;
 
+use itertools::Itertools;
+
 fn machin() {
     use machin_data::MachinEnum;
     use machin_truc::*;
@@ -119,122 +121,194 @@ fn machin() {
     );
 }
 
-fn index_first_char() -> Result<(), String> {
-    use machin_truc::index_first_char::*;
-    use std::collections::VecDeque;
+mod ifc {
+    pub mod chain_1 {
+        use machin_truc::index_first_char::def_1::*;
+        use std::collections::VecDeque;
 
-    #[derive(Default)]
-    struct Reader {
-        buffer: String,
-    }
+        #[derive(Default)]
+        pub struct Reader {
+            buffer: String,
+        }
 
-    impl Iterator for Reader {
-        type Item = Result<Record0<MAX_SIZE>, String>;
+        impl Iterator for Reader {
+            type Item = Result<Record0<MAX_SIZE>, String>;
 
-        fn next(&mut self) -> Option<Self::Item> {
-            self.buffer.clear();
-            let read = match std::io::stdin().read_line(&mut self.buffer) {
-                Ok(read) => read,
-                Err(err) => return Some(Err(err.to_string())),
-            };
-            if read > 0 {
-                let words = self.buffer.trim().to_string();
+            fn next(&mut self) -> Option<Self::Item> {
                 self.buffer.clear();
-                Some(Ok(Record0::new(NewRecord0 { words })))
-            } else {
-                None
+                let read = match std::io::stdin().read_line(&mut self.buffer) {
+                    Ok(read) => read,
+                    Err(err) => return Some(Err(err.to_string())),
+                };
+                if read > 0 {
+                    let words = self.buffer.trim().to_string();
+                    self.buffer.clear();
+                    Some(Ok(Record0::new(NewRecord0 { words })))
+                } else {
+                    None
+                }
+            }
+        }
+
+        #[derive(new)]
+        pub struct Splitter<I: Iterator<Item = Result<Record0<MAX_SIZE>, String>>> {
+            input: I,
+            #[new(default)]
+            buffer: VecDeque<String>,
+        }
+
+        impl<I: Iterator<Item = Result<Record0<MAX_SIZE>, String>>> Iterator for Splitter<I> {
+            type Item = Result<Record1<MAX_SIZE>, String>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.buffer.pop_front().map_or_else(
+                    || loop {
+                        let record_0 = match self.input.next() {
+                            Some(Ok(rec)) => rec,
+                            None => return None,
+                            Some(Err(err)) => return Some(Err(err)),
+                        };
+                        let mut words = record_0.words().split_whitespace();
+                        if let Some(first) = words.next() {
+                            for w in words {
+                                self.buffer.push_back(w.to_string())
+                            }
+                            return Some(Ok(Record1::new(NewRecord1 {
+                                word: first.to_string(),
+                            })));
+                        }
+                    },
+                    |word| Some(Ok(Record1::new(NewRecord1 { word }))),
+                )
+            }
+        }
+
+        #[derive(new)]
+        pub struct AddFirstChar<I: Iterator<Item = Result<Record1<MAX_SIZE>, String>>> {
+            input: I,
+        }
+
+        impl<I: Iterator<Item = Result<Record1<MAX_SIZE>, String>>> Iterator for AddFirstChar<I> {
+            type Item = Result<Record2<MAX_SIZE>, String>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                let record_1 = match self.input.next() {
+                    Some(Ok(rec)) => rec,
+                    None => return None,
+                    Some(Err(err)) => return Some(Err(err)),
+                };
+                let first_char = record_1.word().chars().next().expect("first char");
+                Some(Ok(Record2::from((record_1, RecordIn2 { first_char }))))
+            }
+        }
+
+        #[derive(new)]
+        pub struct Sort<I: Iterator<Item = Result<Record2<MAX_SIZE>, String>>> {
+            input: I,
+            #[new(default)]
+            buffer: Vec<Record2<MAX_SIZE>>,
+            #[new(value = "false")]
+            finalizing: bool,
+        }
+
+        impl<I: Iterator<Item = Result<Record2<MAX_SIZE>, String>>> Iterator for Sort<I> {
+            type Item = Result<Record2<MAX_SIZE>, String>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if !self.finalizing {
+                    for rec in &mut self.input {
+                        let record_2 = match rec {
+                            Ok(rec) => rec,
+                            err @ Err(_) => return Some(err),
+                        };
+                        self.buffer.push(record_2);
+                    }
+                    self.buffer
+                        .sort_by(|a, b| a.first_char().cmp(b.first_char()).reverse());
+                    self.finalizing = true;
+                }
+                self.buffer.pop().map(Ok)
             }
         }
     }
 
-    #[derive(new)]
-    struct Splitter<I: Iterator<Item = Result<Record0<MAX_SIZE>, String>>> {
-        input: I,
-        #[new(default)]
-        buffer: VecDeque<String>,
-    }
+    pub mod chain_2 {
+        use machin_truc::index_first_char::def_1;
+        use machin_truc::index_first_char::def_2::*;
 
-    impl<I: Iterator<Item = Result<Record0<MAX_SIZE>, String>>> Iterator for Splitter<I> {
-        type Item = Result<Record1<MAX_SIZE>, String>;
+        #[derive(new)]
+        pub struct Group<I: Iterator<Item = Result<def_1::Record2<{ def_1::MAX_SIZE }>, String>>> {
+            input: I,
+            #[new(default)]
+            current: Option<Record0<MAX_SIZE>>,
+        }
 
-        fn next(&mut self) -> Option<Self::Item> {
-            self.buffer.pop_front().map_or_else(
-                || loop {
-                    let record_0 = match self.input.next() {
-                        Some(Ok(rec)) => rec,
-                        None => return None,
+        impl<I: Iterator<Item = Result<def_1::Record2<{ def_1::MAX_SIZE }>, String>>> Iterator
+            for Group<I>
+        {
+            type Item = Result<Record0<MAX_SIZE>, String>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                loop {
+                    let rec = match self.input.next() {
+                        Some(Ok(rec)) => Some(rec),
+                        None => None,
                         Some(Err(err)) => return Some(Err(err)),
                     };
-                    let mut words = record_0.words().split_whitespace();
-                    if let Some(first) = words.next() {
-                        for w in words {
-                            self.buffer.push_back(w.to_string())
+                    let ret = if let Some(rec) = rec {
+                        let group_item = group::Record0::new(group::NewRecord0 {
+                            word: rec.word().to_string(),
+                        });
+                        if let Some(current) = &mut self.current {
+                            let first_char = *rec.first_char();
+                            if *current.first_char() == first_char {
+                                current.words_mut().push(group_item);
+                                None
+                            } else {
+                                let complete = std::mem::replace(
+                                    current,
+                                    Record0::new(NewRecord0 {
+                                        first_char: *rec.first_char(),
+                                        words: vec![group_item],
+                                    }),
+                                );
+                                Some(Some(complete))
+                            }
+                        } else {
+                            self.current = Some(Record0::new(NewRecord0 {
+                                first_char: *rec.first_char(),
+                                words: vec![group_item],
+                            }));
+                            None
                         }
-                        return Some(Ok(Record1::new(NewRecord1 {
-                            word: first.to_string(),
-                        })));
-                    }
-                },
-                |word| Some(Ok(Record1::new(NewRecord1 { word }))),
-            )
-        }
-    }
-
-    #[derive(new)]
-    struct AddFirstChar<I: Iterator<Item = Result<Record1<MAX_SIZE>, String>>> {
-        input: I,
-    }
-
-    impl<I: Iterator<Item = Result<Record1<MAX_SIZE>, String>>> Iterator for AddFirstChar<I> {
-        type Item = Result<Record2<MAX_SIZE>, String>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            let record_1 = match self.input.next() {
-                Some(Ok(rec)) => rec,
-                None => return None,
-                Some(Err(err)) => return Some(Err(err)),
-            };
-            let first_char = record_1.word().chars().next();
-            Some(Ok(Record2::from((record_1, RecordIn2 { first_char }))))
-        }
-    }
-
-    #[derive(new)]
-    struct Sort<I: Iterator<Item = Result<Record2<MAX_SIZE>, String>>> {
-        input: I,
-        #[new(default)]
-        buffer: Vec<Record2<MAX_SIZE>>,
-        #[new(value = "false")]
-        finalizing: bool,
-    }
-
-    impl<I: Iterator<Item = Result<Record2<MAX_SIZE>, String>>> Iterator for Sort<I> {
-        type Item = Result<Record2<MAX_SIZE>, String>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            if !self.finalizing {
-                for rec in &mut self.input {
-                    let record_2 = match rec {
-                        Ok(rec) => rec,
-                        err @ Err(_) => return Some(err),
+                    } else {
+                        Some(std::mem::replace(&mut self.current, None))
                     };
-                    self.buffer.push(record_2);
+                    if let Some(ret) = ret {
+                        return ret.map(Ok);
+                    }
                 }
-                self.buffer
-                    .sort_by(|a, b| a.first_char().cmp(b.first_char()).reverse());
-                self.finalizing = true;
             }
-            self.buffer.pop().map(Ok)
         }
     }
+}
 
-    for word in Sort::new(AddFirstChar::new(Splitter::new(Reader::default()))) {
+fn index_first_char() -> Result<(), String> {
+    for word in ifc::chain_2::Group::new(ifc::chain_1::Sort::new(ifc::chain_1::AddFirstChar::new(
+        ifc::chain_1::Splitter::new(ifc::chain_1::Reader::default()),
+    ))) {
         let word = word?;
-        if let Some(first_char) = word.first_char() {
-            println!("{} - {}", first_char, word.word())
-        } else {
-            println!("  - {}", word.word())
-        }
+        println!(
+            "{} - {}",
+            word.first_char(),
+            format!(
+                "[{}]",
+                word.words()
+                    .iter()
+                    .map(machin_truc::index_first_char::def_2::group::Record0::word)
+                    .join(", ")
+            )
+        );
     }
 
     Ok(())

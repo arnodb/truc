@@ -206,7 +206,15 @@ impl RecordVariantBuilder {
     where
         N: Into<String>,
     {
-        self.add_datum_internal::<T, N>(datum_definitions, name, false)
+        self.add_datum_internal(
+            datum_definitions,
+            name.into(),
+            DatumDefinitionPayload {
+                type_name: truc_type_name::<T>(),
+                size: std::mem::size_of::<T>(),
+                allow_uninit: false,
+            },
+        )
     }
 
     fn add_datum_allow_uninit<T, N>(
@@ -218,19 +226,59 @@ impl RecordVariantBuilder {
         T: Copy,
         N: Into<String>,
     {
-        self.add_datum_internal::<T, N>(datum_definitions, name, true)
+        self.add_datum_internal(
+            datum_definitions,
+            name.into(),
+            DatumDefinitionPayload {
+                type_name: truc_type_name::<T>(),
+                size: std::mem::size_of::<T>(),
+                allow_uninit: true,
+            },
+        )
     }
 
-    fn add_datum_internal<T, N>(
+    fn add_datum_override<T, N>(
         &mut self,
         datum_definitions: &mut DatumDefinitionCollection,
         name: N,
-        allow_uninit: bool,
+        datum_override: DatumDefinitionOverride,
     ) -> DatumId
     where
         N: Into<String>,
     {
-        let size = std::mem::size_of::<T>();
+        self.add_datum_internal(
+            datum_definitions,
+            name.into(),
+            DatumDefinitionPayload {
+                type_name: datum_override.type_name.unwrap_or_else(truc_type_name::<T>),
+                size: datum_override.size.unwrap_or_else(std::mem::size_of::<T>),
+                allow_uninit: datum_override.allow_uninit.unwrap_or(false),
+            },
+        )
+    }
+
+    fn copy_datum(
+        &mut self,
+        datum_definitions: &mut DatumDefinitionCollection,
+        datum: &DatumDefinition,
+    ) -> DatumId {
+        self.add_datum_internal(
+            datum_definitions,
+            datum.name().to_string(),
+            DatumDefinitionPayload {
+                type_name: datum.type_name().to_string(),
+                size: datum.size(),
+                allow_uninit: datum.allow_uninit(),
+            },
+        )
+    }
+
+    fn add_datum_internal(
+        &mut self,
+        datum_definitions: &mut DatumDefinitionCollection,
+        name: String,
+        payload: DatumDefinitionPayload,
+    ) -> DatumId {
         let mut data_carret = self.data_carret;
         let mut byte_carret = self.byte_carret;
         while data_carret < self.data.len() {
@@ -241,7 +289,7 @@ impl RecordVariantBuilder {
                 self.data_carret = data_carret;
                 byte_carret += datum.size;
                 self.byte_carret = byte_carret;
-            } else if byte_carret + size < datum.offset {
+            } else if byte_carret + payload.size < datum.offset {
                 break;
             } else {
                 data_carret += 1;
@@ -249,9 +297,13 @@ impl RecordVariantBuilder {
             }
         }
 
-        let type_name = truc_type_name::<T>();
-        let datum_id =
-            datum_definitions.push(name.into(), byte_carret, size, type_name, allow_uninit);
+        let datum_id = datum_definitions.push(
+            name,
+            byte_carret,
+            payload.size,
+            payload.type_name,
+            payload.allow_uninit,
+        );
         self.data.insert(data_carret, datum_id);
         datum_id
     }
@@ -275,6 +327,18 @@ impl RecordVariantBuilder {
             data: self.data,
         }
     }
+}
+
+pub struct DatumDefinitionPayload {
+    pub type_name: String,
+    pub size: usize,
+    pub allow_uninit: bool,
+}
+
+pub struct DatumDefinitionOverride {
+    pub type_name: Option<String>,
+    pub size: Option<usize>,
+    pub allow_uninit: Option<bool>,
 }
 
 pub struct RecordDefinitionBuilder {
@@ -313,6 +377,29 @@ impl RecordDefinitionBuilder {
         let id = self
             .current_variant
             .add_datum_allow_uninit::<T, N>(&mut self.datum_definitions, name);
+        self.variant_dirty = true;
+        id
+    }
+
+    pub fn add_datum_override<T, N>(
+        &mut self,
+        name: N,
+        datum_override: DatumDefinitionOverride,
+    ) -> DatumId
+    where
+        N: Into<String>,
+    {
+        self.current_variant.add_datum_override::<T, N>(
+            &mut self.datum_definitions,
+            name,
+            datum_override,
+        )
+    }
+
+    pub fn copy_datum(&mut self, datum: &DatumDefinition) -> DatumId {
+        let id = self
+            .current_variant
+            .copy_datum(&mut self.datum_definitions, datum);
         self.variant_dirty = true;
         id
     }
