@@ -36,7 +36,8 @@ fn rewrite_type(syn_type: &mut syn::Type) {
                 segments,
             },
         }) => {
-            let mut matched = {
+            let mut matched;
+            matched = {
                 leading_colon.is_none() && {
                     let mut seg_iter = segments.iter_mut();
                     match_segment(seg_iter.next(), "alloc", || {
@@ -51,6 +52,26 @@ fn rewrite_type(syn_type: &mut syn::Type) {
                 seg.ident = syn::Ident::new("String", proc_macro2::Span::call_site());
                 segments.clear();
                 segments.push(seg);
+            }
+            if !matched {
+                matched = {
+                    leading_colon.is_none() && {
+                        let mut seg_iter = segments.iter_mut();
+                        match_segment(seg_iter.next(), "alloc", || {
+                            match_segment(seg_iter.next(), "boxed", || {
+                                match_segment_with_arguments(seg_iter.next(), "Box", || {
+                                    seg_iter.next().is_none()
+                                })
+                            })
+                        })
+                    }
+                };
+                if matched {
+                    let mut seg = segments.pop().expect("segment").into_value();
+                    seg.ident = syn::Ident::new("Box", proc_macro2::Span::call_site());
+                    segments.clear();
+                    segments.push(seg);
+                }
             }
             if !matched {
                 matched = leading_colon.is_none() && {
@@ -198,6 +219,11 @@ fn usize_type_name() {
 #[test]
 fn string_type_name() {
     assert_eq!(&truc_type_name::<String>(), "String");
+}
+
+#[test]
+fn box_type_name() {
+    assert_eq!(&truc_type_name::<Box<String>>(), "Box < String >");
 }
 
 #[test]

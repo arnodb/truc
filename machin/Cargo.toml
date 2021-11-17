@@ -9,3 +9,4 @@ derive-new = "0.5"
 itertools = "0.10"
 machin_data = { path = "../machin_data" }
 machin_truc = { path = "../machin_truc" }
+streamink = { path = "../streamink" }

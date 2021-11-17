@@ -46,10 +46,10 @@ fn machin() {
 fn index_first_char() {
     let mut def_1 = RecordDefinitionBuilder::new();
 
-    let words = def_1.add_datum::<String, _>("words");
+    let words = def_1.add_datum::<Box<str>, _>("words");
     def_1.close_record_variant();
 
-    def_1.add_datum::<String, _>("word");
+    def_1.add_datum::<Box<str>, _>("word");
     def_1.remove_datum(words);
     def_1.close_record_variant();
 

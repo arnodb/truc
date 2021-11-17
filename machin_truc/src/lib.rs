@@ -1,3 +1,5 @@
+#![allow(clippy::borrowed_box)]
+
 #[macro_use]
 extern crate static_assertions;
 
