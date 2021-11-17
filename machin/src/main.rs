@@ -4,7 +4,7 @@ extern crate assert_matches;
 extern crate derive_new;
 
 use itertools::Itertools;
-use streamink::{io::buf::LineStream, sort::SyncSort, stream::sync::SyncStream};
+use streamink::{group::SyncGroup, io::buf::LineStream, sort::SyncSort, stream::sync::SyncStream};
 
 fn machin() {
     use machin_data::MachinEnum;
@@ -161,84 +161,26 @@ pub mod ifc {
             }
         }
     }
-
-    pub mod chain_2 {
-        use machin_truc::index_first_char::def_1;
-        use machin_truc::index_first_char::def_2::*;
-
-        #[derive(new)]
-        pub struct Group<I: Iterator<Item = Result<def_1::Record2<{ def_1::MAX_SIZE }>, String>>> {
-            input: I,
-            #[new(default)]
-            current: Option<Record0<MAX_SIZE>>,
-        }
-
-        impl<I: Iterator<Item = Result<def_1::Record2<{ def_1::MAX_SIZE }>, String>>> Iterator
-            for Group<I>
-        {
-            type Item = Result<Record0<MAX_SIZE>, String>;
-
-            fn next(&mut self) -> Option<Self::Item> {
-                loop {
-                    let rec = match self.input.next() {
-                        Some(Ok(rec)) => Some(rec),
-                        None => None,
-                        Some(Err(err)) => return Some(Err(err)),
-                    };
-                    let ret = if let Some(rec) = rec {
-                        let unpacked_rec = rec.unpack();
-                        let group_item = group::Record0::new(group::UnpackedRecord0 {
-                            word: unpacked_rec.word,
-                        });
-                        if let Some(current) = &mut self.current {
-                            if *current.first_char() == unpacked_rec.first_char {
-                                current.words_mut().push(group_item);
-                                None
-                            } else {
-                                let complete = std::mem::replace(
-                                    current,
-                                    Record0::new(UnpackedRecord0 {
-                                        first_char: unpacked_rec.first_char,
-                                        words: vec![group_item],
-                                    }),
-                                );
-                                Some(Some(complete))
-                            }
-                        } else {
-                            self.current = Some(Record0::new(UnpackedRecord0 {
-                                first_char: unpacked_rec.first_char,
-                                words: vec![group_item],
-                            }));
-                            None
-                        }
-                    } else {
-                        Some(std::mem::replace(&mut self.current, None))
-                    };
-                    if let Some(ret) = ret {
-                        return ret.map(Ok);
-                    }
-                }
-            }
-        }
-    }
 }
 
 fn index_first_char() -> Result<(), String> {
-    for word in ifc::chain_2::Group::new(
-        Box::new(SyncSort::new(
+    for word in SyncGroup::new(
+        SyncSort::new(
             ifc::chain_1::Splitter::new(
                 LineStream::new(std::io::stdin().lock())
                     .map_err(|err| err.to_string())
                     .and_then_map(|line| -> Result<_, String> {
-                        Ok(machin_truc::index_first_char::def_1::Record0::new(
+                        Ok(machin_truc::index_first_char::def_1::Record0::<
+                            { machin_truc::index_first_char::def_1::MAX_SIZE },
+                        >::new(
                             machin_truc::index_first_char::def_1::UnpackedRecord0 { words: line },
                         ))
                     }),
             )
-            .and_then_map(|record_1| {
-                let first_char = record_1.word().chars().next().expect("first char");
+            .and_then_map(|rec| {
+                let first_char = rec.word().chars().next().expect("first char");
                 Ok(machin_truc::index_first_char::def_1::Record2::from((
-                    record_1,
+                    rec,
                     machin_truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
                 )))
             }),
@@ -247,9 +189,31 @@ fn index_first_char() -> Result<(), String> {
                     .cmp(r2.first_char())
                     .then_with(|| r1.word().cmp(r2.word()))
             },
-        ))
-        .transpose(),
-    ) {
+        ),
+        |rec| {
+            (*rec.first_char(), {
+                let machin_truc::index_first_char::def_1::UnpackedRecord2 {
+                    first_char: _,
+                    word,
+                } = rec.unpack();
+                machin_truc::index_first_char::def_2::group::Record0::<
+                    { machin_truc::index_first_char::def_2::group::MAX_SIZE },
+                >::new(
+                    machin_truc::index_first_char::def_2::group::UnpackedRecord0 { word }
+                )
+            })
+        },
+        |first_char, group| {
+            machin_truc::index_first_char::def_2::Record0::<
+                { machin_truc::index_first_char::def_2::MAX_SIZE },
+            >::new(machin_truc::index_first_char::def_2::UnpackedRecord0 {
+                first_char,
+                words: group,
+            })
+        },
+    )
+    .transpose()
+    {
         let word = word?;
         println!(
             "{} - {}",
