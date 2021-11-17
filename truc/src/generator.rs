@@ -1,7 +1,7 @@
 use crate::record::definition::{DatumDefinition, RecordDefinition, RecordVariant};
 use codegen::{Impl, Scope, Type};
 use itertools::{Either, EitherOrBoth, Itertools};
-use std::{collections::BTreeSet, io::Write};
+use std::{collections::BTreeSet, io::Write, ops::Deref};
 
 const CAP_GENERIC: &str = "const CAP: usize";
 const CAP: &str = "CAP";
@@ -58,9 +58,9 @@ This is to be used in custom allocators."#,
             .collect::<Vec<_>>();
 
         let record_name = format!("Record{}", variant.id());
-        let constructor_record_name = format!("NewRecord{}", variant.id());
-        let uninit_constructor_record_name = format!("NewRecordUninit{}", variant.id());
-        let uninit_safe_constructor_record_name = format!("NewRecordUninitSafe{}", variant.id());
+        let unpacked_record_name = format!("UnpackedRecord{}", variant.id());
+        let unpacked_uninit_record_name = format!("UnpackedUninitRecord{}", variant.id());
+        let unpacked_uninit_safe_record_name = format!("UnpackedUninitSafeRecord{}", variant.id());
 
         let (minus_data, plus_data) = if let Some((prev_variant, _prev_record_name)) = &prev_variant
         {
@@ -85,10 +85,10 @@ This is to be used in custom allocators."#,
 
         generate_data_record(
             RecordInfo {
-                name: &constructor_record_name,
+                name: &unpacked_record_name,
                 public: true,
                 doc: Some(
-                    r#"Data container for simple construction.
+                    r#"Data container for packing/unpacking records.
 
 All the fields are named for the safe interoperability between the generated code and the code
 using it."#,
@@ -100,10 +100,10 @@ using it."#,
         );
         generate_data_record(
             RecordInfo {
-                name: &uninit_constructor_record_name,
+                name: &unpacked_uninit_record_name,
                 public: true,
                 doc: Some(
-                    r#"Data container for simple construction without the data to be left uninitialized.
+                    r#"Data container for packing/unpacking records without the data to be left uninitialized.
 
 All the fields are named for the safe interoperability between the generated code and the code
 using it."#,
@@ -113,9 +113,9 @@ using it."#,
             UninitKind::Unsafe,
             &mut scope,
         );
-        let uninit_constructor_record_generic = generate_data_record(
+        let unpacked_uninit_record_generic = generate_data_record(
             RecordInfo {
-                name: &uninit_safe_constructor_record_name,
+                name: &unpacked_uninit_safe_record_name,
                 public: false,
                 doc: Some(
                     r#"It only exists to check that the uninitialized data is actually [`Copy`] at run time."#,
@@ -123,14 +123,14 @@ using it."#,
             },
             &data,
             UninitKind::Safe {
-                unsafe_record_name: &uninit_constructor_record_name,
+                unsafe_record_name: &unpacked_uninit_record_name,
             },
             &mut scope,
         );
-        let constructor_uninit_info = UninitInfo {
-            record_name: &uninit_constructor_record_name,
-            safe_record_name: &uninit_safe_constructor_record_name,
-            record_generic: &uninit_constructor_record_generic,
+        let unpacked_uninit_info = UninitInfo {
+            record_name: &unpacked_uninit_record_name,
+            safe_record_name: &unpacked_uninit_safe_record_name,
+            record_generic: &unpacked_uninit_record_generic,
         };
 
         let record = scope
@@ -160,9 +160,9 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
         generate_record_impl(
             RecordImplRecordNames {
                 name: &record_name,
-                constructor: &constructor_record_name,
+                unpacked: &unpacked_record_name,
             },
-            &constructor_uninit_info,
+            &unpacked_uninit_info,
             &data,
             &mut scope,
         );
@@ -170,7 +170,7 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
         generate_from_constructor_record_impl(
             RecordImplRecordNames {
                 name: &record_name,
-                constructor: &constructor_record_name,
+                unpacked: &unpacked_record_name,
             },
             false,
             &mut scope,
@@ -178,16 +178,17 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
         generate_from_constructor_record_impl(
             RecordImplRecordNames {
                 name: &record_name,
-                constructor: &uninit_constructor_record_name,
+                unpacked: &unpacked_uninit_record_name,
             },
             true,
             &mut scope,
         );
         if let Some((prev_variant, prev_record_name)) = &prev_variant {
-            let plus_record_name = format!("RecordIn{}", variant.id());
-            let uninit_plus_record_name = format!("RecordInUninit{}", variant.id());
-            let uninit_safe_plus_record_name = format!("RecordInUninitSafe{}", variant.id());
-            let and_out_record_name = format!("Record{}AndOut", variant.id());
+            let plus_record_name = format!("UnpackedRecordIn{}", variant.id());
+            let uninit_plus_record_name = format!("UnpackedUninitRecordIn{}", variant.id());
+            let uninit_safe_plus_record_name =
+                format!("UnpackedUninitSafeRecordIn{}", variant.id());
+            let and_out_record_name = format!("Record{}AndUnpackedOut", variant.id());
 
             generate_data_record(
                 RecordInfo {
@@ -322,7 +323,7 @@ It contains all the removed data so that one can still use them, or drop them."#
 
 struct RecordImplRecordNames<'a> {
     name: &'a str,
-    constructor: &'a str,
+    unpacked: &'a str,
 }
 
 fn generate_record_impl(
@@ -336,13 +337,15 @@ fn generate_record_impl(
         .generic(CAP_GENERIC)
         .target_generic(CAP);
 
-    generate_constructor(data, record_names.constructor, None, record_impl);
+    generate_constructor(data, record_names.unpacked, None, record_impl);
     generate_constructor(
         data,
         uninit_info.record_name,
         Some(uninit_info),
         record_impl,
     );
+
+    generate_unpacker(data, record_names.unpacked, record_impl);
 
     for datum in data {
         record_impl
@@ -377,7 +380,7 @@ struct UninitInfo<'a> {
 
 fn generate_constructor(
     data: &[&DatumDefinition],
-    constructor_record_name: &str,
+    unpacked_record_name: &str,
     uninit: Option<&UninitInfo>,
     record_impl: &mut Impl,
 ) {
@@ -404,7 +407,7 @@ fn generate_constructor(
             } else {
                 "_from"
             },
-            constructor_record_name,
+            unpacked_record_name,
         )
         .ret("Self");
     if let Some(uninit) = uninit {
@@ -439,6 +442,35 @@ fn generate_constructor(
     new_fn.line("Self { data }");
 }
 
+fn generate_unpacker(
+    data: &[&DatumDefinition],
+    unpacked_record_name: &str,
+    record_impl: &mut Impl,
+) {
+    let unpack_fn = record_impl
+        .new_fn("unpack")
+        .arg_self()
+        .vis("pub")
+        .ret(unpacked_record_name);
+    for datum in data {
+        unpack_fn.line(format!(
+            "let {}: {} = unsafe {{ self.data.read({}) }};",
+            datum.name(),
+            datum.type_name(),
+            datum.offset(),
+        ));
+    }
+    unpack_fn.line("std::mem::forget(self);");
+    unpack_fn.line(format!(
+        "{} {{ {} }}",
+        unpacked_record_name,
+        data.iter()
+            .map(Deref::deref)
+            .map(DatumDefinition::name)
+            .join(", ")
+    ));
+}
+
 fn generate_drop_impl(record_name: &str, data: &[&DatumDefinition], scope: &mut Scope) {
     let drop_impl = scope
         .new_impl(record_name)
@@ -466,11 +498,11 @@ fn generate_from_constructor_record_impl(
         .new_impl(record_names.name)
         .generic(CAP_GENERIC)
         .target_generic(CAP)
-        .impl_trait(format!("From<{}>", record_names.constructor));
+        .impl_trait(format!("From<{}>", record_names.unpacked));
 
     let from_fn = from_impl
         .new_fn("from")
-        .arg("from", record_names.constructor)
+        .arg("from", record_names.unpacked)
         .ret("Self");
     from_fn.line(format!(
         "Self::{}(from)",

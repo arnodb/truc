@@ -10,7 +10,7 @@ fn machin() {
     use machin_data::MachinEnum;
     use machin_truc::*;
 
-    let record_4 = Record4::<MAX_SIZE>::new(NewRecord4 {
+    let record_4 = Record4::<MAX_SIZE>::new(UnpackedRecord4 {
         datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,
         datum_c: 0b_0100_0100_0100_0100_0100_0100_0100_0100,
         datum_d: 0b_0101_0101,
@@ -26,7 +26,7 @@ fn machin() {
     assert_eq!(*record_4.datum_f(), 0x88888888);
     assert_matches!(record_4.machin_enum(), &MachinEnum::Number(42000000000));
 
-    let mut record_4 = Record4::<MAX_SIZE>::from(NewRecordUninit4 {
+    let mut record_4 = Record4::<MAX_SIZE>::from(UnpackedUninitRecord4 {
         machin_enum: MachinEnum::Text("Hello World!".to_string()),
     });
 
@@ -46,7 +46,7 @@ fn machin() {
         MachinEnum::Text(text) if text.as_str() == "Hello World!"
     );
 
-    let mut record_0 = Record0::<MAX_SIZE>::new(NewRecord0 {
+    let mut record_0 = Record0::<MAX_SIZE>::new(UnpackedRecord0 {
         datum_a: 1,
         datum_b: 2,
     });
@@ -57,7 +57,7 @@ fn machin() {
     let datum_c = *record_0.datum_a() + *record_0.datum_b();
     *record_0.datum_a_mut() = 42;
 
-    let mut record_1 = Record1::from((record_0, RecordIn1 { datum_c }));
+    let mut record_1 = Record1::from((record_0, UnpackedRecordIn1 { datum_c }));
 
     assert_eq!(*record_1.datum_a(), 42);
     assert_eq!(*record_1.datum_b(), 2);
@@ -65,10 +65,10 @@ fn machin() {
 
     *record_1.datum_b_mut() = 12;
 
-    let Record2AndOut {
+    let Record2AndUnpackedOut {
         record: record_2,
         datum_a,
-    } = Record2AndOut::from((record_1, RecordIn2 {}));
+    } = Record2AndUnpackedOut::from((record_1, UnpackedRecordIn2 {}));
 
     assert_eq!(datum_a, 42);
 
@@ -77,7 +77,7 @@ fn machin() {
 
     let record_3 = Record3::from((
         record_2,
-        RecordIn3 {
+        UnpackedRecordIn3 {
             datum_d: 4,
             datum_e: 5,
             datum_f: 6,
@@ -92,7 +92,7 @@ fn machin() {
 
     let record_4 = Record4::from((
         record_3,
-        RecordIn4 {
+        UnpackedRecordIn4 {
             machin_enum: MachinEnum::Text("Foo".to_string()),
         },
     ));
@@ -109,7 +109,7 @@ fn machin() {
 
     let record_5 = Record5::from((
         record_4,
-        RecordIn5 {
+        UnpackedRecordIn5 {
             datum_string: "Hello".to_string(),
             datum_array_of_strings: ["Hello".to_string(), "World".to_string()],
         },
@@ -153,10 +153,10 @@ pub mod ifc {
                             for w in words {
                                 self.buffer.push_back(w.into())
                             }
-                            return Ok(Some(Record1::new(NewRecord1 { word: first.into() })));
+                            return Ok(Some(Record1::new(UnpackedRecord1 { word: first.into() })));
                         }
                     },
-                    |word| Ok(Some(Record1::new(NewRecord1 { word }))),
+                    |word| Ok(Some(Record1::new(UnpackedRecord1 { word }))),
                 )
             }
         }
@@ -186,28 +186,27 @@ pub mod ifc {
                         Some(Err(err)) => return Some(Err(err)),
                     };
                     let ret = if let Some(rec) = rec {
-                        let group_item = group::Record0::new(group::NewRecord0 {
-                            // TODO do not clone
-                            word: rec.word().clone(),
+                        let unpacked_rec = rec.unpack();
+                        let group_item = group::Record0::new(group::UnpackedRecord0 {
+                            word: unpacked_rec.word,
                         });
                         if let Some(current) = &mut self.current {
-                            let first_char = *rec.first_char();
-                            if *current.first_char() == first_char {
+                            if *current.first_char() == unpacked_rec.first_char {
                                 current.words_mut().push(group_item);
                                 None
                             } else {
                                 let complete = std::mem::replace(
                                     current,
-                                    Record0::new(NewRecord0 {
-                                        first_char: *rec.first_char(),
+                                    Record0::new(UnpackedRecord0 {
+                                        first_char: unpacked_rec.first_char,
                                         words: vec![group_item],
                                     }),
                                 );
                                 Some(Some(complete))
                             }
                         } else {
-                            self.current = Some(Record0::new(NewRecord0 {
-                                first_char: *rec.first_char(),
+                            self.current = Some(Record0::new(UnpackedRecord0 {
+                                first_char: unpacked_rec.first_char,
                                 words: vec![group_item],
                             }));
                             None
@@ -232,7 +231,7 @@ fn index_first_char() -> Result<(), String> {
                     .map_err(|err| err.to_string())
                     .and_then_map(|line| -> Result<_, String> {
                         Ok(machin_truc::index_first_char::def_1::Record0::new(
-                            machin_truc::index_first_char::def_1::NewRecord0 { words: line },
+                            machin_truc::index_first_char::def_1::UnpackedRecord0 { words: line },
                         ))
                     }),
             )
@@ -240,7 +239,7 @@ fn index_first_char() -> Result<(), String> {
                 let first_char = record_1.word().chars().next().expect("first char");
                 Ok(machin_truc::index_first_char::def_1::Record2::from((
                     record_1,
-                    machin_truc::index_first_char::def_1::RecordIn2 { first_char },
+                    machin_truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
                 )))
             }),
             |r1, r2| {
