@@ -102,11 +102,13 @@ impl RecordVariant {
         write!(f, "{} [", self.id)?;
         let mut first = true;
         let mut byte_offset = 0;
-        for d in &self.data {
+        for &d in &self.data {
             if !first {
                 write!(f, ", ")?;
             }
-            let datum = datum_definitions.get(*d).expect("datum");
+            let datum = datum_definitions
+                .get(d)
+                .unwrap_or_else(|| panic!("datum #{}", d));
             if byte_offset > datum.offset {
                 panic!("offset clash {} > {}", byte_offset, datum.offset);
             }
@@ -283,7 +285,9 @@ impl RecordVariantBuilder {
         let mut byte_carret = self.byte_carret;
         while data_carret < self.data.len() {
             let carret_datum_id = self.data[data_carret];
-            let datum = datum_definitions.get(carret_datum_id).expect("datum");
+            let datum = datum_definitions
+                .get(carret_datum_id)
+                .unwrap_or_else(|| panic!("datum #{}", carret_datum_id));
             if datum.offset == byte_carret {
                 data_carret += 1;
                 self.data_carret = data_carret;
@@ -314,7 +318,10 @@ impl RecordVariantBuilder {
             self.data.remove(index);
             if index < self.data_carret {
                 self.data_carret = index;
-                self.byte_carret = datum_definitions.get(id).expect("datum").offset;
+                self.byte_carret = datum_definitions
+                    .get(id)
+                    .unwrap_or_else(|| panic!("datum #{}", id))
+                    .offset;
             }
         } else {
             panic!("Could not find datum to remove, id = {}", id);
@@ -426,6 +433,25 @@ impl RecordDefinitionBuilder {
 
     pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
         self.variants.get(id.0)
+    }
+
+    pub fn get_variant_datum_definition_by_name(
+        &self,
+        variant_id: RecordVariantId,
+        name: &str,
+    ) -> Option<&DatumDefinition> {
+        self.get_variant(variant_id).and_then(|variant| {
+            for d in variant.data() {
+                let datum = self
+                    .datum_definitions
+                    .get(d)
+                    .filter(|datum| datum.name() == name);
+                if datum.is_some() {
+                    return datum;
+                }
+            }
+            None
+        })
     }
 
     pub fn build(mut self) -> RecordDefinition {

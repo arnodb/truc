@@ -4,5 +4,7 @@ members = [
     "truc",
     "truc_runtime",
     "machin_data",
-    "machin"
+    "machin",
+    "skatik_prod_data",
+    "skatik_prod"
 ]
