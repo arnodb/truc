@@ -49,20 +49,14 @@ fn index_first_char() {
     let words = def_1.add_datum::<Box<str>, _>("words");
     def_1.close_record_variant();
 
-    def_1.add_datum::<Box<str>, _>("word");
     def_1.remove_datum(words);
+    def_1.add_datum::<Box<str>, _>("word");
     def_1.close_record_variant();
 
     def_1.add_datum::<char, _>("first_char");
     let last_variant_1 = def_1.close_record_variant();
 
-    let def_1 = def_1.build();
-
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let dest = Path::new(&out_dir);
-    let mut file = File::create(&dest.join("index_first_char_1.rs")).unwrap();
-    generate(&def_1, &mut file).unwrap();
-
+    let mut def_2 = RecordDefinitionBuilder::new();
     let mut def_2_group = RecordDefinitionBuilder::new();
 
     for d in def_1
@@ -77,27 +71,35 @@ fn index_first_char() {
         def_2_group.copy_datum(datum);
     }
 
-    let def_2_group = def_2_group.build();
-
-    let mut file = File::create(&dest.join("index_first_char_2_group.rs")).unwrap();
-    generate(&def_2_group, &mut file).unwrap();
-
-    let mut def_2 = RecordDefinitionBuilder::new();
+    let group = def_2_group.close_record_variant();
 
     def_2.add_datum::<char, _>("first_char");
     def_2.add_datum_override::<Vec<()>, _>(
         "words",
         DatumDefinitionOverride {
-            type_name: Some("Vec<group::Record0<{ group::MAX_SIZE }>>".to_string()),
+            type_name: Some(format!(
+                "Vec<group::Record{}<{{ group::MAX_SIZE }}>>",
+                group
+            )),
             size: None,
             allow_uninit: None,
         },
     );
 
-    let def_2 = def_2.build();
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let dest = Path::new(&out_dir);
 
+    let def_1 = def_1.build();
+    let mut file = File::create(&dest.join("index_first_char_1.rs")).unwrap();
+    generate(&def_1, &mut file).unwrap();
+
+    let def_2 = def_2.build();
     let mut file = File::create(&dest.join("index_first_char_2.rs")).unwrap();
     generate(&def_2, &mut file).unwrap();
+
+    let def_2_group = def_2_group.build();
+    let mut file = File::create(&dest.join("index_first_char_2_group.rs")).unwrap();
+    generate(&def_2_group, &mut file).unwrap();
 }
 
 fn main() {

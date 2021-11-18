@@ -164,32 +164,30 @@ pub mod ifc {
 }
 
 fn index_first_char() -> Result<(), String> {
-    for word in SyncGroup::new(
-        SyncSort::new(
-            ifc::chain_1::Splitter::new(
-                LineStream::new(std::io::stdin().lock())
-                    .map_err(|err| err.to_string())
-                    .and_then_map(|line| -> Result<_, String> {
-                        Ok(machin_truc::index_first_char::def_1::Record0::<
-                            { machin_truc::index_first_char::def_1::MAX_SIZE },
-                        >::new(
-                            machin_truc::index_first_char::def_1::UnpackedRecord0 { words: line },
-                        ))
-                    }),
-            )
-            .and_then_map(|rec| {
-                let first_char = rec.word().chars().next().expect("first char");
-                Ok(machin_truc::index_first_char::def_1::Record2::from((
-                    rec,
-                    machin_truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
-                )))
-            }),
-            |r1, r2| {
-                r1.first_char()
-                    .cmp(r2.first_char())
-                    .then_with(|| r1.word().cmp(r2.word()))
-            },
-        ),
+    let input = std::io::stdin();
+    let lines = LineStream::new(input.lock())
+        .map_err(|err| err.to_string())
+        .and_then_map(|line| -> Result<_, String> {
+            Ok(machin_truc::index_first_char::def_1::Record0::<
+                { machin_truc::index_first_char::def_1::MAX_SIZE },
+            >::new(
+                machin_truc::index_first_char::def_1::UnpackedRecord0 { words: line },
+            ))
+        });
+    let splitted = ifc::chain_1::Splitter::new(lines).and_then_map(|rec| {
+        let first_char = rec.word().chars().next().expect("first char");
+        Ok(machin_truc::index_first_char::def_1::Record2::from((
+            rec,
+            machin_truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
+        )))
+    });
+    let sorted = SyncSort::new(splitted, |r1, r2| {
+        r1.first_char()
+            .cmp(r2.first_char())
+            .then_with(|| r1.word().cmp(r2.word()))
+    });
+    let grouped = SyncGroup::new(
+        sorted,
         |rec| {
             (*rec.first_char(), {
                 let machin_truc::index_first_char::def_1::UnpackedRecord2 {
@@ -211,9 +209,8 @@ fn index_first_char() -> Result<(), String> {
                 words: group,
             })
         },
-    )
-    .transpose()
-    {
+    );
+    for word in grouped.transpose() {
         let word = word?;
         println!(
             "{} - {}",

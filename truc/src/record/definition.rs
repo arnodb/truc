@@ -149,16 +149,16 @@ impl RecordDefinition {
         self.datum_definitions.iter()
     }
 
+    pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition> {
+        self.datum_definitions.get(id)
+    }
+
     pub fn variants(&self) -> impl Iterator<Item = &RecordVariant> {
         self.variants.iter()
     }
 
     pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
         self.variants.get(id.0)
-    }
-
-    pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition> {
-        self.datum_definitions.get(id)
     }
 }
 
@@ -418,6 +418,14 @@ impl RecordDefinitionBuilder {
         self.variants.push(variant);
         self.variant_dirty = false;
         variant_id
+    }
+
+    pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition> {
+        self.datum_definitions.get(id)
+    }
+
+    pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
+        self.variants.get(id.0)
     }
 
     pub fn build(mut self) -> RecordDefinition {
