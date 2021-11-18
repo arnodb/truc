@@ -4,6 +4,5 @@ members = [
     "truc",
     "truc_runtime",
     "machin_data",
-    "machin_truc",
     "machin"
 ]

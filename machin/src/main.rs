@@ -2,13 +2,19 @@
 extern crate assert_matches;
 #[macro_use]
 extern crate derive_new;
+#[macro_use]
+extern crate static_assertions;
 
 use itertools::Itertools;
 use streamink::{group::SyncGroup, io::buf::LineStream, sort::SyncSort, stream::sync::SyncStream};
 
+#[allow(dead_code)]
+#[allow(clippy::borrowed_box)]
+mod truc;
+
 fn machin() {
+    use crate::truc::*;
     use machin_data::MachinEnum;
-    use machin_truc::*;
 
     let record_4 = Record4::<MAX_SIZE>::new(UnpackedRecord4 {
         datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,
@@ -124,7 +130,7 @@ fn machin() {
 
 pub mod ifc {
     pub mod chain_1 {
-        use machin_truc::index_first_char::def_1::*;
+        use crate::truc::index_first_char::def_1::*;
         use std::collections::VecDeque;
         use streamink::stream::sync::SyncStream;
 
@@ -168,17 +174,17 @@ fn index_first_char() -> Result<(), String> {
     let lines = LineStream::new(input.lock())
         .map_err(|err| err.to_string())
         .and_then_map(|line| -> Result<_, String> {
-            Ok(machin_truc::index_first_char::def_1::Record0::<
-                { machin_truc::index_first_char::def_1::MAX_SIZE },
+            Ok(crate::truc::index_first_char::def_1::Record0::<
+                { crate::truc::index_first_char::def_1::MAX_SIZE },
             >::new(
-                machin_truc::index_first_char::def_1::UnpackedRecord0 { words: line },
+                crate::truc::index_first_char::def_1::UnpackedRecord0 { words: line },
             ))
         });
     let splitted = ifc::chain_1::Splitter::new(lines).and_then_map(|rec| {
         let first_char = rec.word().chars().next().expect("first char");
-        Ok(machin_truc::index_first_char::def_1::Record2::from((
+        Ok(crate::truc::index_first_char::def_1::Record2::from((
             rec,
-            machin_truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
+            crate::truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
         )))
     });
     let sorted = SyncSort::new(splitted, |r1, r2| {
@@ -190,21 +196,21 @@ fn index_first_char() -> Result<(), String> {
         sorted,
         |rec| {
             (*rec.first_char(), {
-                let machin_truc::index_first_char::def_1::UnpackedRecord2 {
+                let crate::truc::index_first_char::def_1::UnpackedRecord2 {
                     first_char: _,
                     word,
                 } = rec.unpack();
-                machin_truc::index_first_char::def_2::group::Record0::<
-                    { machin_truc::index_first_char::def_2::group::MAX_SIZE },
+                crate::truc::index_first_char::def_2::group::Record0::<
+                    { crate::truc::index_first_char::def_2::group::MAX_SIZE },
                 >::new(
-                    machin_truc::index_first_char::def_2::group::UnpackedRecord0 { word }
+                    crate::truc::index_first_char::def_2::group::UnpackedRecord0 { word }
                 )
             })
         },
         |first_char, group| {
-            machin_truc::index_first_char::def_2::Record0::<
-                { machin_truc::index_first_char::def_2::MAX_SIZE },
-            >::new(machin_truc::index_first_char::def_2::UnpackedRecord0 {
+            crate::truc::index_first_char::def_2::Record0::<
+                { crate::truc::index_first_char::def_2::MAX_SIZE },
+            >::new(crate::truc::index_first_char::def_2::UnpackedRecord0 {
                 first_char,
                 words: group,
             })
@@ -219,7 +225,7 @@ fn index_first_char() -> Result<(), String> {
                 "[{}]",
                 word.words()
                     .iter()
-                    .map(machin_truc::index_first_char::def_2::group::Record0::word)
+                    .map(crate::truc::index_first_char::def_2::group::Record0::word)
                     .join(", ")
             )
         );
