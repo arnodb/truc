@@ -1,6 +1,7 @@
 use machin_data::MachinEnum;
 use std::env;
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use truc::generator::generate;
 use truc::record::definition::{DatumDefinitionOverride, RecordDefinitionBuilder};
@@ -40,7 +41,7 @@ fn machin() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest = Path::new(&out_dir);
     let mut file = File::create(&dest.join("machin_truc.rs")).unwrap();
-    generate(&definition, &mut file).unwrap();
+    write!(file, "{}", generate(&definition)).unwrap();
 }
 
 fn index_first_char() {
@@ -91,15 +92,15 @@ fn index_first_char() {
 
     let def_1 = def_1.build();
     let mut file = File::create(&dest.join("index_first_char_1.rs")).unwrap();
-    generate(&def_1, &mut file).unwrap();
+    write!(file, "{}", generate(&def_1)).unwrap();
 
     let def_2 = def_2.build();
     let mut file = File::create(&dest.join("index_first_char_2.rs")).unwrap();
-    generate(&def_2, &mut file).unwrap();
+    write!(file, "{}", generate(&def_2)).unwrap();
 
     let def_2_group = def_2_group.build();
     let mut file = File::create(&dest.join("index_first_char_2_group.rs")).unwrap();
-    generate(&def_2_group, &mut file).unwrap();
+    write!(file, "{}", generate(&def_2_group)).unwrap();
 }
 
 fn main() {

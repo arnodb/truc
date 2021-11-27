@@ -1,15 +1,12 @@
 use crate::record::definition::{DatumDefinition, RecordDefinition, RecordVariant};
 use codegen::{Impl, Scope, Type};
 use itertools::{Either, EitherOrBoth, Itertools};
-use std::{collections::BTreeSet, io::Write, ops::Deref};
+use std::{collections::BTreeSet, ops::Deref};
 
 const CAP_GENERIC: &str = "const CAP: usize";
 const CAP: &str = "CAP";
 
-pub fn generate<W: Write>(
-    definition: &RecordDefinition,
-    output: &mut W,
-) -> Result<(), std::io::Error> {
+pub fn generate(definition: &RecordDefinition) -> String {
     let mut scope = Scope::new();
 
     scope.import("truc_runtime::data", "RecordMaybeUninit");
@@ -323,8 +320,7 @@ It contains all the removed data so that one can still use them, or drop them."#
         ));
     }
 
-    write!(output, "{}", scope.to_string())?;
-    Ok(())
+    scope.to_string()
 }
 
 struct RecordImplRecordNames<'a> {

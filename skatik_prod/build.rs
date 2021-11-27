@@ -101,7 +101,7 @@ impl Graph {
         let mut file = File::create(&output.join("chain.rs")).unwrap();
         for (name, definition) in &self.record_definitions {
             write!(file, "pub mod {} {{\n\n", name)?;
-            generate(definition, &mut file).unwrap();
+            write!(file, "{}", generate(definition)).unwrap();
             write!(&mut file, "\n\n}}")?;
         }
         Ok(())
