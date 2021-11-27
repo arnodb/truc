@@ -28,6 +28,7 @@ impl ChainSourceThread {
         &self,
         source_name: &NodeStreamSource,
         chain_module: &FullyQualifiedName,
+        error_type: &str,
     ) -> String {
         if self.pipe.is_none() {
             format!(
@@ -39,9 +40,10 @@ impl ChainSourceThread {
             format!(
                 r#"let input = {{
     let rx = thread_control.input_{stream_index}.take().expect("input {stream_index}");
-    streamink::sync::mpsc::Receive::<_, SkatikError>::new(rx)
+    streamink::sync::mpsc::Receive::<_, {error_type}>::new(rx)
 }};"#,
-                stream_index = self.stream_index
+                stream_index = self.stream_index,
+                error_type = error_type,
             )
         }
     }
@@ -51,6 +53,8 @@ impl ChainSourceThread {
 pub struct Chain<'a> {
     streams_module_name: FullyQualifiedName,
     module_name: FullyQualifiedName,
+    custom_module_import: Vec<(String, String)>,
+    error_type: String,
     scope: &'a mut Scope,
     #[new(default)]
     threads: Vec<ChainThread>,
@@ -122,9 +126,11 @@ impl<'a> Chain<'a> {
         });
         let name = format!("thread_{}", thread_id);
         let module = self.scope.new_module(&name).vis("pub").scope();
-        module.import("crate::core", "*");
         module.import("std::sync::mpsc", "{Receiver, SyncSender}");
         module.import("streamink::stream::sync", "SyncStream");
+        for (path, ty) in &self.custom_module_import {
+            module.import(path, ty);
+        }
         thread_id
     }
 
@@ -209,8 +215,11 @@ impl<'a> Chain<'a> {
                 .new_fn("skatik_pipe")
                 .vis("pub")
                 .arg("thread_control", "&mut ThreadControl")
-                .ret("impl FnOnce() -> Result<(), SkatikError>");
-            let input = source_thread.format_input(source, &self.module_name);
+                .ret(format!(
+                    "impl FnOnce() -> Result<(), {error_type}>",
+                    error_type = self.error_type,
+                ));
+            let input = source_thread.format_input(source, &self.module_name, &self.error_type);
             fn_body(
                 format!(
                     r#"let tx = thread_control.output_0.take().expect("output 0");
@@ -273,11 +282,10 @@ move || {{
             }
         }
 
-        let main_fn = self
-            .scope
-            .new_fn("main")
-            .vis("pub")
-            .ret("Result<(), SkatikError>");
+        let main_fn = self.scope.new_fn("main").vis("pub").ret(format!(
+            "Result<(), {error_type}>",
+            error_type = self.error_type,
+        ));
         for pipe in 0..self.pipe_count {
             main_fn.line(format!(
                 "let (tx_{pipe}, rx_{pipe}) = std::sync::mpsc::sync_channel(42);",

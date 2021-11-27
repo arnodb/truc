@@ -71,6 +71,8 @@ impl<const IN: usize, const OUT: usize> DynNode for NodeCluster<IN, OUT> {
 pub struct GraphBuilder {
     chain_streams_module_name: FullyQualifiedName,
     chain_module_name: FullyQualifiedName,
+    chain_custom_module_import: Vec<(String, String)>,
+    chain_error_type: String,
     #[new(default)]
     record_definitions: HashMap<StreamRecordType, RefCell<RecordDefinitionBuilder>>,
     #[new(default)]
@@ -107,6 +109,8 @@ impl GraphBuilder {
         Graph {
             chain_streams_module_name: self.chain_streams_module_name,
             chain_module_name: self.chain_module_name,
+            chain_custom_module_import: self.chain_custom_module_import,
+            chain_error_type: self.chain_error_type,
             record_definitions: self
                 .record_definitions
                 .into_iter()
@@ -128,6 +132,8 @@ impl GraphBuilder {
 pub struct Graph {
     chain_streams_module_name: FullyQualifiedName,
     chain_module_name: FullyQualifiedName,
+    chain_custom_module_import: Vec<(String, String)>,
+    chain_error_type: String,
     record_definitions: HashMap<StreamRecordType, RecordDefinition>,
     entry_nodes: Vec<Box<dyn DynNode>>,
 }
@@ -164,12 +170,16 @@ impl Graph {
         }
         {
             let mut scope = Scope::new();
-            scope.import("crate::core", "*");
             scope.import("streamink::stream::sync", "SyncStream");
+            for (path, ty) in &self.chain_custom_module_import {
+                scope.import(path, ty);
+            }
 
             let mut chain = Chain::new(
                 self.chain_streams_module_name.clone(),
                 self.chain_module_name.clone(),
+                self.chain_custom_module_import.clone(),
+                self.chain_error_type.clone(),
                 &mut scope,
             );
 
