@@ -6,7 +6,7 @@ extern crate derive_new;
 extern crate static_assertions;
 
 use itertools::Itertools;
-use streamink::{group::SyncGroup, io::buf::LineStream, sort::SyncSort, stream::sync::SyncStream};
+use streamink::{group::Group, io::buf::LineStream, sort::SyncSort, stream::sync::SyncStream};
 
 #[allow(dead_code)]
 #[allow(clippy::borrowed_box)]
@@ -192,28 +192,31 @@ fn index_first_char() -> Result<(), String> {
             .cmp(r2.first_char())
             .then_with(|| r1.word().cmp(r2.word()))
     });
-    let grouped = SyncGroup::new(
+    let grouped = Group::new(
         sorted,
         |rec| {
-            (*rec.first_char(), {
-                let crate::truc::index_first_char::def_1::UnpackedRecord2 {
-                    first_char: _,
-                    word,
-                } = rec.unpack();
-                crate::truc::index_first_char::def_2::group::Record0::<
-                    { crate::truc::index_first_char::def_2::group::MAX_SIZE },
-                >::new(
-                    crate::truc::index_first_char::def_2::group::UnpackedRecord0 { word }
-                )
+            let crate::truc::index_first_char::def_1::UnpackedRecord2 { first_char, word } =
+                rec.unpack();
+            crate::truc::index_first_char::def_1::Record3::<
+                { crate::truc::index_first_char::def_1::MAX_SIZE },
+            >::new(crate::truc::index_first_char::def_1::UnpackedRecord3 {
+                first_char,
+                words: vec![crate::truc::index_first_char::def_2::Record0::new(
+                    crate::truc::index_first_char::def_2::UnpackedRecord0 { word },
+                )],
             })
         },
-        |first_char, group| {
-            crate::truc::index_first_char::def_2::Record0::<
-                { crate::truc::index_first_char::def_2::MAX_SIZE },
-            >::new(crate::truc::index_first_char::def_2::UnpackedRecord0 {
-                first_char,
-                words: group,
-            })
+        |group, rec| group.first_char() == rec.first_char(),
+        |group, rec| {
+            let crate::truc::index_first_char::def_1::UnpackedRecord2 {
+                first_char: _,
+                word,
+            } = rec.unpack();
+            group
+                .words_mut()
+                .push(crate::truc::index_first_char::def_2::Record0::new(
+                    crate::truc::index_first_char::def_2::UnpackedRecord0 { word },
+                ));
         },
     );
     for word in grouped.transpose() {
@@ -225,7 +228,7 @@ fn index_first_char() -> Result<(), String> {
                 "[{}]",
                 word.words()
                     .iter()
-                    .map(crate::truc::index_first_char::def_2::group::Record0::word)
+                    .map(crate::truc::index_first_char::def_2::Record0::word)
                     .join(", ")
             )
         );

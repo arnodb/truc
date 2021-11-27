@@ -51,35 +51,22 @@ fn index_first_char() {
     def_1.close_record_variant();
 
     def_1.remove_datum(words);
-    def_1.add_datum::<Box<str>, _>("word");
+    let word = def_1.add_datum::<Box<str>, _>("word");
     def_1.close_record_variant();
 
     def_1.add_datum::<char, _>("first_char");
-    let last_variant_1 = def_1.close_record_variant();
+    def_1.close_record_variant();
 
     let mut def_2 = RecordDefinitionBuilder::new();
-    let mut def_2_group = RecordDefinitionBuilder::new();
+    def_2.copy_datum(def_1.get_datum_definition(word).expect("datum"));
+    let group = def_2.close_record_variant();
 
-    for d in def_1
-        .get_variant(last_variant_1)
-        .expect("last variant 1")
-        .data()
-    {
-        let datum = def_1.get_datum_definition(d).expect("datum");
-        if datum.name() == "first_char" {
-            continue;
-        }
-        def_2_group.copy_datum(datum);
-    }
-
-    let group = def_2_group.close_record_variant();
-
-    def_2.add_datum::<char, _>("first_char");
-    def_2.add_datum_override::<Vec<()>, _>(
+    def_1.remove_datum(word);
+    def_1.add_datum_override::<Vec<()>, _>(
         "words",
         DatumDefinitionOverride {
             type_name: Some(format!(
-                "Vec<group::Record{}<{{ group::MAX_SIZE }}>>",
+                "Vec<super::def_2::Record{}<{{ super::def_2::MAX_SIZE }}>>",
                 group
             )),
             size: None,
@@ -97,10 +84,6 @@ fn index_first_char() {
     let def_2 = def_2.build();
     let mut file = File::create(&dest.join("index_first_char_2.rs")).unwrap();
     write!(file, "{}", generate(&def_2)).unwrap();
-
-    let def_2_group = def_2_group.build();
-    let mut file = File::create(&dest.join("index_first_char_2_group.rs")).unwrap();
-    write!(file, "{}", generate(&def_2_group)).unwrap();
 }
 
 fn main() {

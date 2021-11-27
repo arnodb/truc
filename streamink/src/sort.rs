@@ -1,6 +1,5 @@
-use std::cmp::Ordering;
-
 use crate::stream::sync::SyncStream;
+use std::cmp::Ordering;
 
 /// Sorts items in memory and stream them.
 #[derive(new)]
