@@ -328,21 +328,27 @@ move || {{
         main_fn.line("Ok(())");
     }
 
-    pub fn get_or_new_module_scope<'i, M>(
+    pub fn get_or_new_module_scope<'i>(
         &mut self,
         path: impl IntoIterator<Item = &'i Box<str>>,
-        modify_module: M,
-    ) -> &mut Scope
-    where
-        M: Fn(&mut Module),
-    {
+        chain_customizer: &ChainCustomizer,
+        thread_id: usize,
+    ) -> &mut Scope {
         let mut iter = path.into_iter();
+        let customize_module = |module: &mut Module| {
+            for (path, ty) in &chain_customizer.custom_module_imports {
+                module.import(path, ty);
+            }
+            module.import("streamink::stream::sync", "SyncStream");
+            let thread_module = format!("thread_{}", thread_id);
+            module.scope().import("super", &thread_module).vis("pub");
+        };
         if let Some(first) = iter.next() {
             let module = self.scope.get_or_new_module(first);
-            (modify_module)(module);
+            (customize_module)(module);
             iter.fold(module, |m, n| {
                 let module = m.get_or_new_module(n).vis("pub");
-                (modify_module)(module);
+                (customize_module)(module);
                 module
             })
             .scope()

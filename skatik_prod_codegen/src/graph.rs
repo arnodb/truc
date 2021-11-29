@@ -13,6 +13,8 @@ use std::{
 use truc::record::definition::{RecordDefinition, RecordDefinitionBuilder};
 
 pub trait Node<const IN: usize, const OUT: usize> {
+    fn inputs(&self) -> &[NodeStream; IN];
+    fn outputs(&self) -> &[NodeStream; OUT];
     fn gen_chain(&self, graph: &Graph, chain: &mut Chain);
 }
 
@@ -23,7 +25,7 @@ pub trait DynNode {
 #[macro_export]
 macro_rules! dyn_node {
     ($t:ty) => {
-        impl skatik_prod_codegen::graph::DynNode for $t {
+        impl DynNode for $t {
             fn dyn_gen_chain(&self, graph: &Graph, chain: &mut Chain) {
                 self.gen_chain(graph, chain)
             }
@@ -54,6 +56,14 @@ impl<const IN: usize, const OUT: usize> NodeCluster<IN, OUT> {
 }
 
 impl<const IN: usize, const OUT: usize> Node<IN, OUT> for NodeCluster<IN, OUT> {
+    fn inputs(&self) -> &[NodeStream; IN] {
+        &self.inputs
+    }
+
+    fn outputs(&self) -> &[NodeStream; OUT] {
+        &self.outputs
+    }
+
     fn gen_chain(&self, graph: &Graph, chain: &mut Chain) {
         for node in &self.nodes {
             node.dyn_gen_chain(graph, chain);

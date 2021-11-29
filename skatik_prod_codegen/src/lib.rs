@@ -4,6 +4,7 @@ extern crate derive_more;
 extern crate derive_new;
 
 pub mod chain;
+pub mod filter;
 pub mod graph;
 pub mod stream;
 pub mod support;
