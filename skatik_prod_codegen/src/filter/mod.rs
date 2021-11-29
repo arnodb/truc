@@ -1,3 +1,4 @@
+pub mod anchor;
 pub mod dedup;
 pub mod fork;
 pub mod group;

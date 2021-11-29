@@ -8,4 +8,5 @@ codegen = "0.1"
 derive_more = "0.99"
 derive-new = "0.5"
 itertools = "0.10"
+skatik_prod_data = { path = "../skatik_prod_data" }
 truc = { path = "../truc" }
