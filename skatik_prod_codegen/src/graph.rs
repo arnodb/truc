@@ -1,5 +1,5 @@
 use crate::{
-    chain::Chain,
+    chain::{Chain, ChainCustomizer},
     stream::{NodeStream, StreamRecordType},
     support::FullyQualifiedName,
 };
@@ -69,10 +69,7 @@ impl<const IN: usize, const OUT: usize> DynNode for NodeCluster<IN, OUT> {
 
 #[derive(new)]
 pub struct GraphBuilder {
-    chain_streams_module_name: FullyQualifiedName,
-    chain_module_name: FullyQualifiedName,
-    chain_custom_module_import: Vec<(String, String)>,
-    chain_error_type: String,
+    chain_customizer: ChainCustomizer,
     #[new(default)]
     record_definitions: HashMap<StreamRecordType, RefCell<RecordDefinitionBuilder>>,
     #[new(default)]
@@ -107,10 +104,7 @@ impl GraphBuilder {
 
     pub fn build(self, entry_nodes: Vec<Box<dyn DynNode>>) -> Graph {
         Graph {
-            chain_streams_module_name: self.chain_streams_module_name,
-            chain_module_name: self.chain_module_name,
-            chain_custom_module_import: self.chain_custom_module_import,
-            chain_error_type: self.chain_error_type,
+            chain_customizer: self.chain_customizer,
             record_definitions: self
                 .record_definitions
                 .into_iter()
@@ -120,31 +114,20 @@ impl GraphBuilder {
         }
     }
 
-    pub fn chain_streams_module_name(&self) -> &FullyQualifiedName {
-        &self.chain_streams_module_name
-    }
-
-    pub fn chain_module_name(&self) -> &FullyQualifiedName {
-        &self.chain_module_name
+    pub fn chain_customizer(&self) -> &ChainCustomizer {
+        &self.chain_customizer
     }
 }
 
 pub struct Graph {
-    chain_streams_module_name: FullyQualifiedName,
-    chain_module_name: FullyQualifiedName,
-    chain_custom_module_import: Vec<(String, String)>,
-    chain_error_type: String,
+    chain_customizer: ChainCustomizer,
     record_definitions: HashMap<StreamRecordType, RecordDefinition>,
     entry_nodes: Vec<Box<dyn DynNode>>,
 }
 
 impl Graph {
-    pub fn chain_streams_module_name(&self) -> &FullyQualifiedName {
-        &self.chain_streams_module_name
-    }
-
-    pub fn chain_module_name(&self) -> &FullyQualifiedName {
-        &self.chain_module_name
+    pub fn chain_customizer(&self) -> &ChainCustomizer {
+        &self.chain_customizer
     }
 
     pub fn record_definitions(&self) -> &HashMap<StreamRecordType, RecordDefinition> {
@@ -171,17 +154,11 @@ impl Graph {
         {
             let mut scope = Scope::new();
             scope.import("streamink::stream::sync", "SyncStream");
-            for (path, ty) in &self.chain_custom_module_import {
+            for (path, ty) in &self.chain_customizer.custom_module_imports {
                 scope.import(path, ty);
             }
 
-            let mut chain = Chain::new(
-                self.chain_streams_module_name.clone(),
-                self.chain_module_name.clone(),
-                self.chain_custom_module_import.clone(),
-                self.chain_error_type.clone(),
-                &mut scope,
-            );
+            let mut chain = Chain::new(&self.chain_customizer, &mut scope);
 
             for node in &self.entry_nodes {
                 node.dyn_gen_chain(self, &mut chain);

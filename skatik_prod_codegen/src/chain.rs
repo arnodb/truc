@@ -27,13 +27,12 @@ impl ChainSourceThread {
     pub fn format_input(
         &self,
         source_name: &NodeStreamSource,
-        chain_module: &FullyQualifiedName,
-        error_type: &str,
+        customizer: &ChainCustomizer,
     ) -> String {
         if self.pipe.is_none() {
             format!(
                 "let input = {chain_module}::{source_name}(thread_control);",
-                chain_module = chain_module,
+                chain_module = customizer.module_name,
                 source_name = source_name
             )
         } else {
@@ -43,7 +42,7 @@ impl ChainSourceThread {
     streamink::sync::mpsc::Receive::<_, {error_type}>::new(rx)
 }};"#,
                 stream_index = self.stream_index,
-                error_type = error_type,
+                error_type = customizer.error_type,
             )
         }
     }
@@ -51,10 +50,7 @@ impl ChainSourceThread {
 
 #[derive(new)]
 pub struct Chain<'a> {
-    streams_module_name: FullyQualifiedName,
-    module_name: FullyQualifiedName,
-    custom_module_import: Vec<(String, String)>,
-    error_type: String,
+    customizer: &'a ChainCustomizer,
     scope: &'a mut Scope,
     #[new(default)]
     threads: Vec<ChainThread>,
@@ -128,7 +124,7 @@ impl<'a> Chain<'a> {
         let module = self.scope.new_module(&name).vis("pub").scope();
         module.import("std::sync::mpsc", "{Receiver, SyncSender}");
         module.import("streamink::stream::sync", "SyncStream");
-        for (path, ty) in &self.custom_module_import {
+        for (path, ty) in &self.customizer.custom_module_imports {
             module.import(path, ty);
         }
         thread_id
@@ -217,9 +213,9 @@ impl<'a> Chain<'a> {
                 .arg("thread_control", "&mut ThreadControl")
                 .ret(format!(
                     "impl FnOnce() -> Result<(), {error_type}>",
-                    error_type = self.error_type,
+                    error_type = self.customizer.error_type,
                 ));
-            let input = source_thread.format_input(source, &self.module_name, &self.error_type);
+            let input = source_thread.format_input(source, self.customizer);
             fn_body(
                 format!(
                     r#"let tx = thread_control.output_0.take().expect("output 0");
@@ -257,7 +253,7 @@ move || {{
                 .scope();
             let thread_struct = scope.new_struct("ThreadControl").vis("pub");
             for (i, input_stream) in thread.input_streams.iter().enumerate() {
-                let def = input_stream.definition_fragments(&self.streams_module_name);
+                let def = input_stream.definition_fragments(&self.customizer.streams_module_name);
                 thread_struct.field(
                     &format!("pub input_{}", i),
                     format!(
@@ -269,7 +265,8 @@ move || {{
             }
             if thread.output_pipes.is_some() {
                 for (i, output_stream) in thread.output_streams.iter().enumerate() {
-                    let def = output_stream.definition_fragments(&self.streams_module_name);
+                    let def =
+                        output_stream.definition_fragments(&self.customizer.streams_module_name);
                     thread_struct.field(
                         &format!("pub output_{}", i),
                         format!(
@@ -284,7 +281,7 @@ move || {{
 
         let main_fn = self.scope.new_fn("main").vis("pub").ret(format!(
             "Result<(), {error_type}>",
-            error_type = self.error_type,
+            error_type = self.customizer.error_type,
         ));
         for pipe in 0..self.pipe_count {
             main_fn.line(format!(
@@ -351,6 +348,41 @@ move || {{
             .scope()
         } else {
             self.scope
+        }
+    }
+}
+
+pub const DEFAULT_CHAIN_ROOT_MODULE_NAME: [&str; 2] = ["crate", "truc"];
+pub const DEFAULT_CHAIN_STREAMS_MODULE_NAME: &str = "chain_streams";
+pub const DEFAULT_CHAIN_MODULE_NAME: &str = "chain";
+pub const DEFAULT_CHAIN_MODULE_IMPORTS: [(&str, &str); 1] = [("crate::core", "*")];
+pub const DEFAULT_CHAIN_ERROR_TYPE: &str = "SkatikError";
+
+pub struct ChainCustomizer {
+    pub streams_module_name: FullyQualifiedName,
+    pub module_name: FullyQualifiedName,
+    pub custom_module_imports: Vec<(String, String)>,
+    pub error_type: String,
+}
+
+impl Default for ChainCustomizer {
+    fn default() -> Self {
+        Self {
+            streams_module_name: FullyQualifiedName::new_n(
+                DEFAULT_CHAIN_ROOT_MODULE_NAME
+                    .iter()
+                    .chain([DEFAULT_CHAIN_STREAMS_MODULE_NAME].iter()),
+            ),
+            module_name: FullyQualifiedName::new_n(
+                DEFAULT_CHAIN_ROOT_MODULE_NAME
+                    .iter()
+                    .chain([DEFAULT_CHAIN_MODULE_NAME].iter()),
+            ),
+            custom_module_imports: DEFAULT_CHAIN_MODULE_IMPORTS
+                .iter()
+                .map(|(path, ty)| (path.to_string(), ty.to_string()))
+                .collect(),
+            error_type: DEFAULT_CHAIN_ERROR_TYPE.to_string(),
         }
     }
 }
