@@ -1,5 +1,5 @@
 use crate::{
-    chain::Chain,
+    chain::{Chain, ImportScope},
     dyn_node,
     graph::{DynNode, Graph, GraphBuilder, Node},
     stream::{NodeStream, NodeStreamSource},
@@ -33,6 +33,8 @@ impl Node<1, 1> for Dedup {
             graph.chain_customizer(),
             thread.thread_id,
         );
+        let mut import_scope = ImportScope::default();
+        import_scope.add_import_with_error_type("streamink::stream::sync", "SyncStream");
         let node_fn = scope
             .new_fn(local_name)
             .vis("pub")
@@ -41,7 +43,11 @@ impl Node<1, 1> for Dedup {
                 format!("&mut thread_{}::ThreadControl", thread.thread_id),
             )
             .ret(def.impl_sync_stream);
-        let input = thread.format_input(self.inputs[0].source(), graph.chain_customizer());
+        let input = thread.format_input(
+            self.inputs[0].source(),
+            graph.chain_customizer(),
+            &mut import_scope,
+        );
         let record_definition = &graph.record_definitions()[self.inputs[0].record_type()];
         let variant = record_definition
             .get_variant(self.inputs[0].variant_id())
@@ -54,7 +60,7 @@ impl Node<1, 1> for Dedup {
             if i > 0 {
                 write!(eq, " &&\n        ").expect("write");
             }
-            write!(eq, "a.{field}().eq(&b.{field}())", field = datum.name()).expect("write");
+            write!(eq, "a.{field}().eq(b.{field}())", field = datum.name()).expect("write");
         }
         crate::chain::fn_body(
             format!(
@@ -68,6 +74,7 @@ streamink::dedup::Dedup::new(
             ),
             node_fn,
         );
+        import_scope.import(scope, graph.chain_customizer());
 
         chain.update_thread_single_stream(thread.thread_id, &self.outputs[0]);
     }

@@ -1,468 +1,153 @@
-use skatik_prod_data::AnchorId;
-use std::{
-    cell::RefCell,
-    collections::{hash_map::Entry, HashMap, HashSet},
-    fs::File,
-    io::Write,
-    ops::{Deref, DerefMut},
-    path::Path,
-};
-use truc::{
-    generator::generate,
-    record::definition::{
-        DatumDefinitionOverride, RecordDefinition, RecordDefinitionBuilder, RecordVariantId,
+use skatik_prod_codegen::{
+    chain::{Chain, ChainCustomizer, ImportScope},
+    dyn_node,
+    filter::{
+        anchor::anchorize, dedup::dedup, hof::index::wordlist::build_word_list, sink::sink,
+        sort::sort,
     },
+    graph::{DynNode, Graph, GraphBuilder, Node},
+    stream::{NodeStream, NodeStreamSource, StreamRecordType},
+    support::FullyQualifiedName,
 };
+use std::path::Path;
 
-struct StreamDefinition {
-    record_definition_builder: RecordDefinitionBuilder,
+struct ReadStdin {
+    name: FullyQualifiedName,
+    field: String,
+    outputs: [NodeStream; 1],
 }
 
-impl Deref for StreamDefinition {
-    type Target = RecordDefinitionBuilder;
-
-    fn deref(&self) -> &Self::Target {
-        &self.record_definition_builder
+impl Node<0, 1> for ReadStdin {
+    fn inputs(&self) -> &[NodeStream; 0] {
+        &[]
     }
-}
 
-impl DerefMut for StreamDefinition {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.record_definition_builder
-    }
-}
-
-#[derive(Clone)]
-struct StreamAndVariant {
-    name: String,
-    variant_id: RecordVariantId,
-}
-
-trait Node {
-    fn outputs(&self) -> &[StreamAndVariant];
-}
-
-struct NodeCluster<const OUT: usize> {
-    outputs: [StreamAndVariant; OUT],
-}
-
-impl<const OUT: usize> Node for NodeCluster<OUT> {
-    fn outputs(&self) -> &[StreamAndVariant] {
+    fn outputs(&self) -> &[NodeStream; 1] {
         &self.outputs
     }
-}
 
-#[derive(Default)]
-struct GraphBuilder {
-    record_definitions: HashMap<String, RefCell<RecordDefinitionBuilder>>,
-    anchor_tables: HashSet<usize>,
-}
+    fn gen_chain(&self, graph: &Graph, chain: &mut Chain) {
+        let thread_id = chain.new_thread(
+            self.name.clone(),
+            Box::new([]),
+            self.outputs.to_vec().into_boxed_slice(),
+            None,
+            false,
+            Some(self.name.clone()),
+        );
 
-impl GraphBuilder {
-    fn new_stream(&mut self, name: String) {
-        match self.record_definitions.entry(name) {
-            Entry::Vacant(entry) => {
-                let record_definition_builder = RecordDefinitionBuilder::new();
-                entry.insert(record_definition_builder.into());
-            }
-            Entry::Occupied(entry) => {
-                panic!(r#"Stream "{}" already exists"#, entry.key())
-            }
-        }
-    }
+        let local_name = self.name.last().expect("local name");
+        let def =
+            self.outputs[0].definition_fragments(&graph.chain_customizer().streams_module_name);
+        let scope = chain.get_or_new_module_scope(
+            self.name.iter().take(self.name.len() - 1),
+            graph.chain_customizer(),
+            thread_id,
+        );
+        let mut import_scope = ImportScope::default();
+        import_scope.add_error_type();
+        let node_fn = scope
+            .new_fn(local_name)
+            .vis("pub")
+            .arg(
+                "thread_control",
+                format!("&mut thread_{}::ThreadControl", thread_id),
+            )
+            .ret(format!(
+                "impl FnOnce() -> Result<(), {error_type}>",
+                error_type = graph.chain_customizer().error_type_name()
+            ));
+        skatik_prod_codegen::chain::fn_body(
+            format!(
+                r#"let tx = thread_control.output_0.take().expect("output");
+move || {{
+    use std::io::BufRead;
 
-    fn new_anchor_table(&mut self) -> usize {
-        let anchor_table_id = self.anchor_tables.len();
-        self.anchor_tables.insert(anchor_table_id);
-        anchor_table_id
-    }
-
-    fn get_stream(&self, name: &str) -> Option<&RefCell<RecordDefinitionBuilder>> {
-        self.record_definitions.get(name)
-    }
-
-    fn build(self) -> Graph {
-        Graph {
-            record_definitions: self
-                .record_definitions
-                .into_iter()
-                .map(|(name, builder)| (name, builder.into_inner().build()))
-                .collect(),
-        }
-    }
-}
-
-struct Graph {
-    record_definitions: HashMap<String, RecordDefinition>,
-}
-
-impl Graph {
-    fn generate(&self, output: &Path) -> Result<(), std::io::Error> {
-        let mut file = File::create(&output.join("chain.rs")).unwrap();
-        for (name, definition) in &self.record_definitions {
-            write!(file, "pub mod {} {{\n\n", name)?;
-            write!(file, "{}", generate(definition)).unwrap();
-            write!(&mut file, "\n\n}}")?;
-        }
-        Ok(())
-    }
-}
-
-fn extract_fields(
-    graph: &mut GraphBuilder,
-    id: &str,
-    inputs: [StreamAndVariant; 1],
-    fields: &[&str],
-) -> NodeCluster<2> {
-    let [input] = inputs;
-
-    let extracted_stream_name = format!("{}_extracted", id);
-    graph.new_stream(extracted_stream_name.clone());
-
-    let extracted_variant_id = {
-        let stream = graph
-            .get_stream(&input.name)
-            .unwrap_or_else(|| panic!(r#"stream "{}""#, input.name))
-            .borrow_mut();
-
-        let mut extracted_stream = graph
-            .get_stream(&extracted_stream_name)
-            .unwrap_or_else(|| panic!(r#"stream "{}""#, extracted_stream_name))
-            .borrow_mut();
-
-        for field in fields {
-            extracted_stream.copy_datum(
-                stream
-                    .get_variant_datum_definition_by_name(input.variant_id, field)
-                    .unwrap_or_else(|| panic!(r#"datum "{}""#, field)),
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
+    let mut buffer = String::new();
+    loop {{
+        let read = input.read_line(&mut buffer).map_err(|err| SkatikError::Custom(err.to_string()))?;
+        if read > 0 {{
+            let value = std::mem::take(&mut buffer);
+            let value = value.trim_end_matches('\n');
+            let record = {record}::<
+                {{ {prefix}MAX_SIZE }},
+            >::new(
+                {unpacked_record} {{ {field}: value.to_string().into_boxed_str() }},
             );
-        }
-        extracted_stream.close_record_variant()
-    };
-
-    NodeCluster {
-        outputs: [
-            input,
-            StreamAndVariant {
-                name: extracted_stream_name,
-                variant_id: extracted_variant_id,
-            },
-        ],
-    }
-}
-
-fn anchorize(
-    graph: &mut GraphBuilder,
-    _id: &str,
-    inputs: [StreamAndVariant; 1],
-    anchor_field: &str,
-) -> NodeCluster<1> {
-    let [input] = inputs;
-
-    let anchor_table_id = graph.new_anchor_table();
-
-    let variant_id = {
-        let mut stream = graph
-            .get_stream(&input.name)
-            .unwrap_or_else(|| panic!(r#"stream "{}""#, input.name))
-            .borrow_mut();
-
-        stream.add_datum_override::<AnchorId<0>, _>(
-            anchor_field,
-            DatumDefinitionOverride {
-                type_name: Some(format!("skatik_prod_data::AnchorId<{}>", anchor_table_id)),
-                size: None,
-                allow_uninit: None,
-            },
+            tx.send(Some(record))?;
+        }} else {{
+            tx.send(None)?;
+            return Ok(());
+        }}
+    }}
+}}"#,
+                field = self.field,
+                prefix = def.prefix,
+                record = def.record,
+                unpacked_record = def.unpacked_record,
+            ),
+            node_fn,
         );
-        stream.close_record_variant()
-    };
-
-    NodeCluster {
-        outputs: [StreamAndVariant {
-            name: input.name,
-            variant_id,
-        }],
+        import_scope.import(scope, graph.chain_customizer());
     }
 }
 
-fn simplify_strings(
-    _graph: &mut GraphBuilder,
-    _id: &str,
-    inputs: [StreamAndVariant; 1],
-    _field: &str,
-) -> NodeCluster<1> {
-    NodeCluster { outputs: inputs }
-}
+dyn_node!(ReadStdin);
 
-fn reverse_strings(
-    _graph: &mut GraphBuilder,
-    _id: &str,
-    inputs: [StreamAndVariant; 1],
-    _field: &str,
-) -> NodeCluster<1> {
-    NodeCluster { outputs: inputs }
-}
-
-fn sort(
-    _graph: &mut GraphBuilder,
-    _id: &str,
-    inputs: [StreamAndVariant; 1],
-    _fields: &[&str],
-) -> NodeCluster<1> {
-    NodeCluster { outputs: inputs }
-}
-
-fn dedup(
-    _graph: &mut GraphBuilder,
-    _id: &str,
-    inputs: [StreamAndVariant; 1],
-    _field: &str,
-) -> NodeCluster<1> {
-    NodeCluster { outputs: inputs }
-}
-
-fn group(
-    graph: &mut GraphBuilder,
-    id: &str,
-    inputs: [StreamAndVariant; 1],
-    fields: &[&str],
-    rs_field: &str,
-) -> NodeCluster<1> {
-    let [input] = inputs;
-
-    let rs_stream_name = format!("{}_rs", id);
-    graph.new_stream(rs_stream_name.clone());
+fn read_stdin(graph: &mut GraphBuilder, name: FullyQualifiedName, field: &str) -> ReadStdin {
+    let record_type = StreamRecordType::from(name.sub("read"));
+    graph.new_stream(record_type.clone());
 
     let variant_id = {
         let mut stream = graph
-            .get_stream(&input.name)
-            .unwrap_or_else(|| panic!(r#"stream "{}""#, input.name))
-            .borrow_mut();
-
-        let mut rs_stream = graph
-            .get_stream(&rs_stream_name)
-            .unwrap_or_else(|| panic!(r#"stream "{}""#, rs_stream_name))
-            .borrow_mut();
-
-        for &field in fields {
-            let datum = stream
-                .get_variant_datum_definition_by_name(input.variant_id, field)
-                .unwrap_or_else(|| panic!(r#"datum "{}""#, field));
-            rs_stream.copy_datum(datum);
-            let datum_id = datum.id();
-            stream.remove_datum(datum_id);
-        }
-        let rs_variant_id = rs_stream.close_record_variant();
-
-        stream.add_datum_override::<Vec<()>, _>(
-            rs_field,
-            DatumDefinitionOverride {
-                type_name: Some(format!(
-                    "Vec<super::{}::Record{}<{{ super::{}::MAX_SIZE }}>>",
-                    rs_stream_name, rs_variant_id, rs_stream_name
-                )),
-                size: None,
-                allow_uninit: None,
-            },
-        );
-        stream.close_record_variant()
-    };
-
-    NodeCluster {
-        outputs: [StreamAndVariant {
-            name: input.name,
-            variant_id,
-        }],
-    }
-}
-
-fn build_rev_table(
-    graph: &mut GraphBuilder,
-    id: &str,
-    inputs: [StreamAndVariant; 1],
-    token_field: &str,
-    reference_field: &str,
-) -> NodeCluster<2> {
-    let [input] = inputs;
-
-    let extract_token = extract_fields(
-        graph,
-        &format!("{}_extract_token", id),
-        [input],
-        &[token_field, reference_field],
-    );
-
-    let reverse_token = reverse_strings(
-        graph,
-        &format!("{}_reverse_token", id),
-        [extract_token.outputs()[1].clone()],
-        token_field,
-    );
-    let sort_token = sort(
-        graph,
-        &format!("{}_sort_token", id),
-        [reverse_token.outputs()[0].clone()],
-        &[token_field],
-    );
-
-    NodeCluster {
-        outputs: [
-            extract_token.outputs()[0].clone(),
-            sort_token.outputs()[0].clone(),
-        ],
-    }
-}
-
-fn build_sim_table(
-    graph: &mut GraphBuilder,
-    id: &str,
-    inputs: [StreamAndVariant; 1],
-    token_field: &str,
-    reference_field: &str,
-    ref_rs_field: &str,
-) -> NodeCluster<2> {
-    let [input] = inputs;
-
-    let extract_token = extract_fields(
-        graph,
-        &format!("{}_extract_token", id),
-        [input],
-        &[token_field, reference_field],
-    );
-
-    let simplify_token = simplify_strings(
-        graph,
-        &format!("{}_simplify_token", id),
-        [extract_token.outputs()[1].clone()],
-        token_field,
-    );
-    let sort_token = sort(
-        graph,
-        &format!("{}_sort_token", id),
-        [simplify_token.outputs()[0].clone()],
-        &[token_field, reference_field],
-    );
-    let group = group(
-        graph,
-        &format!("{}_group", id),
-        [sort_token.outputs()[0].clone()],
-        &[reference_field],
-        ref_rs_field,
-    );
-
-    NodeCluster {
-        outputs: [
-            extract_token.outputs()[0].clone(),
-            group.outputs()[0].clone(),
-        ],
-    }
-}
-
-fn build_word_list(
-    graph: &mut GraphBuilder,
-    id: &str,
-    inputs: [StreamAndVariant; 1],
-    token_field: &str,
-    anchor_field: &str,
-    sim_anchor_field: &str,
-    sim_rs_field: &str,
-) -> NodeCluster<4> {
-    let [input] = inputs;
-
-    let sim = build_sim_table(
-        graph,
-        &format!("{}_sim", id),
-        [input],
-        token_field,
-        anchor_field,
-        sim_rs_field,
-    );
-    let rev = build_rev_table(
-        graph,
-        &format!("{}_rev", id),
-        [sim.outputs()[0].clone()],
-        token_field,
-        anchor_field,
-    );
-
-    let anchorize = anchorize(
-        graph,
-        &format!("{}_anchorize", id),
-        [sim.outputs()[1].clone()],
-        sim_anchor_field,
-    );
-    let sim_rev = build_rev_table(
-        graph,
-        &format!("{}_sim_rev", id),
-        [anchorize.outputs()[0].clone()],
-        token_field,
-        sim_anchor_field,
-    );
-
-    NodeCluster {
-        outputs: [
-            rev.outputs()[0].clone(),
-            rev.outputs()[1].clone(),
-            sim_rev.outputs()[0].clone(),
-            sim_rev.outputs()[1].clone(),
-        ],
-    }
-}
-
-fn read(
-    graph: &mut GraphBuilder,
-    id: &str,
-    _inputs: [StreamAndVariant; 0],
-    _field: &str,
-) -> NodeCluster<1> {
-    let read_stream_name = format!("{}_read", id);
-    graph.new_stream(read_stream_name.clone());
-
-    let variant_id = {
-        let mut stream = graph
-            .get_stream(&read_stream_name)
-            .unwrap_or_else(|| panic!(r#"stream "{}""#, read_stream_name))
+            .get_stream(&record_type)
+            .unwrap_or_else(|| panic!(r#"stream "{}""#, record_type))
             .borrow_mut();
 
         stream.add_datum::<Box<str>, _>("token");
         stream.close_record_variant()
     };
 
-    NodeCluster {
-        outputs: [StreamAndVariant {
-            name: read_stream_name,
+    ReadStdin {
+        name: name.clone(),
+        field: field.to_string(),
+        outputs: [NodeStream::new(
+            record_type,
             variant_id,
-        }],
+            NodeStreamSource::from(name),
+        )],
     }
 }
 
 fn main() {
-    let mut graph = GraphBuilder::default();
+    let mut graph = GraphBuilder::new(ChainCustomizer::default());
 
-    let read_token = read(&mut graph, "read_token", [], "token");
+    let root = FullyQualifiedName::default();
+
+    let read_token = read_stdin(&mut graph, root.sub("read_token"), "token");
     let sort_token = sort(
         &mut graph,
-        "sort_token",
+        root.sub("sort_token"),
         [read_token.outputs()[0].clone()],
         &["token"],
     );
     let dedup_token = dedup(
         &mut graph,
-        "dedup_token",
+        root.sub("dedup_token"),
         [sort_token.outputs()[0].clone()],
-        "token",
     );
     let anchorize = anchorize(
         &mut graph,
-        "anchor",
+        root.sub("anchor"),
         [dedup_token.outputs()[0].clone()],
         "anchor",
     );
 
-    build_word_list(
+    let word_list = build_word_list(
         &mut graph,
-        "word_list",
+        root.sub("word_list"),
         [anchorize.outputs()[0].clone()],
         "token",
         "anchor",
@@ -470,7 +155,51 @@ fn main() {
         "sim_rs",
     );
 
-    let graph = graph.build();
+    let sink_1 = sink(
+        &mut graph,
+        root.sub("sink_1"),
+        word_list.outputs()[0].clone(),
+        Some(r#"println!("sink_1 {} (id = {:?})", record.token(), record.anchor());"#.to_string()),
+    );
+    let sink_2 = sink(
+        &mut graph,
+        root.sub("sink_2"),
+        word_list.outputs()[1].clone(),
+        Some(r#"println!("sink_2 {} (id = {:?})", record.token(), record.anchor());"#.to_string()),
+    );
+    let sink_3 = sink(
+        &mut graph,
+        root.sub("sink_3"),
+        word_list.outputs()[2].clone(),
+        Some(
+            r#"println!("sink_3 {} (sim id = {:?}) == {}", record.token(), record.sim_anchor(), record.sim_rs().len());
+for r in record.sim_rs().iter() {
+    println!("    {:?}", r.anchor());
+}"#
+            .to_string(),
+        ),
+    );
+    let sink_4 = sink(
+        &mut graph,
+        root.sub("sink_4"),
+        word_list.outputs()[3].clone(),
+        Some(
+            r#"println!("sink_4 {} (sim id = {:?})", record.token(), record.sim_anchor());"#
+                .to_string(),
+        ),
+    );
+
+    let graph = graph.build(vec![
+        Box::new(read_token),
+        Box::new(sort_token),
+        Box::new(dedup_token),
+        Box::new(anchorize),
+        Box::new(word_list),
+        Box::new(sink_1),
+        Box::new(sink_2),
+        Box::new(sink_3),
+        Box::new(sink_4),
+    ]);
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
     graph.generate(Path::new(&out_dir)).unwrap();

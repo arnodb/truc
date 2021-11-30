@@ -4,7 +4,7 @@ use crate::{
 };
 use codegen::{Function, Module, Scope};
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 struct ChainThread {
     id: usize,
@@ -28,6 +28,7 @@ impl ChainSourceThread {
         &self,
         source_name: &NodeStreamSource,
         customizer: &ChainCustomizer,
+        import_scope: &mut ImportScope,
     ) -> String {
         if self.pipe.is_none() {
             format!(
@@ -36,6 +37,7 @@ impl ChainSourceThread {
                 source_name = source_name
             )
         } else {
+            import_scope.add_error_type();
             format!(
                 r#"let input = {{
     let rx = thread_control.input_{stream_index}.take().expect("input {stream_index}");
@@ -122,8 +124,6 @@ impl<'a> Chain<'a> {
         });
         let name = format!("thread_{}", thread_id);
         let module = self.scope.new_module(&name).vis("pub").scope();
-        module.import("std::sync::mpsc", "{Receiver, SyncSender}");
-        module.import("streamink::stream::sync", "SyncStream");
         for (path, ty) in &self.customizer.custom_module_imports {
             module.import(path, ty);
         }
@@ -205,17 +205,19 @@ impl<'a> Chain<'a> {
             .get_module_mut(&name)
             .expect("thread module")
             .scope();
+        let mut import_scope = ImportScope::default();
         if thread.output_pipes.is_none() {
             assert_eq!(thread.output_streams.len(), 1);
+            import_scope.add_import_with_error_type("streamink::stream::sync", "SyncStream");
             let pipe_fn = scope
                 .new_fn("skatik_pipe")
                 .vis("pub")
                 .arg("thread_control", "&mut ThreadControl")
                 .ret(format!(
                     "impl FnOnce() -> Result<(), {error_type}>",
-                    error_type = self.customizer.error_type,
+                    error_type = self.customizer.error_type_name(),
                 ));
-            let input = source_thread.format_input(source, self.customizer);
+            let input = source_thread.format_input(source, self.customizer, &mut import_scope);
             fn_body(
                 format!(
                     r#"let tx = thread_control.output_0.take().expect("output 0");
@@ -236,6 +238,7 @@ move || {{
             thread.output_pipes = Some(Box::new([pipe]));
             thread.main = Some(FullyQualifiedName::new(name).sub("skatik_pipe"));
         }
+        import_scope.import(scope, self.customizer);
         Some(pipe)
     }
 
@@ -251,6 +254,12 @@ move || {{
                 .get_module_mut(&name)
                 .expect("thread module")
                 .scope();
+            if thread.input_streams.len() > 0 {
+                scope.import("std::sync::mpsc", "Receiver");
+            }
+            if thread.output_pipes.is_some() && thread.output_streams.len() > 0 {
+                scope.import("std::sync::mpsc", "SyncSender");
+            }
             let thread_struct = scope.new_struct("ThreadControl").vis("pub");
             for (i, input_stream) in thread.input_streams.iter().enumerate() {
                 let def = input_stream.definition_fragments(&self.customizer.streams_module_name);
@@ -339,7 +348,6 @@ move || {{
             for (path, ty) in &chain_customizer.custom_module_imports {
                 module.import(path, ty);
             }
-            module.import("streamink::stream::sync", "SyncStream");
             let thread_module = format!("thread_{}", thread_id);
             module.scope().import("super", &thread_module).vis("pub");
         };
@@ -358,17 +366,33 @@ move || {{
     }
 }
 
-pub const DEFAULT_CHAIN_ROOT_MODULE_NAME: [&str; 2] = ["crate", "truc"];
-pub const DEFAULT_CHAIN_STREAMS_MODULE_NAME: &str = "chain_streams";
-pub const DEFAULT_CHAIN_MODULE_NAME: &str = "chain";
-pub const DEFAULT_CHAIN_MODULE_IMPORTS: [(&str, &str); 1] = [("crate::core", "*")];
-pub const DEFAULT_CHAIN_ERROR_TYPE: &str = "SkatikError";
+pub const DEFAULT_CHAIN_ROOT_MODULE_NAME: [&str; 2] = ["crate", "chain"];
+pub const DEFAULT_CHAIN_STREAMS_MODULE_NAME: &str = "streams";
+pub const DEFAULT_CHAIN_ERROR_TYPE: [&str; 2] = ["skatik_prod_data", "SkatikError"];
 
 pub struct ChainCustomizer {
     pub streams_module_name: FullyQualifiedName,
     pub module_name: FullyQualifiedName,
     pub custom_module_imports: Vec<(String, String)>,
-    pub error_type: String,
+    pub error_type: FullyQualifiedName,
+}
+
+impl ChainCustomizer {
+    pub fn error_type_path(&self) -> String {
+        self.error_type
+            .iter()
+            .take(self.error_type.len() - 1)
+            .map(Deref::deref)
+            .collect()
+    }
+
+    pub fn error_type_name(&self) -> String {
+        self.error_type
+            .iter()
+            .last()
+            .expect("error_type last")
+            .to_string()
+    }
 }
 
 impl Default for ChainCustomizer {
@@ -379,17 +403,48 @@ impl Default for ChainCustomizer {
                     .iter()
                     .chain([DEFAULT_CHAIN_STREAMS_MODULE_NAME].iter()),
             ),
-            module_name: FullyQualifiedName::new_n(
-                DEFAULT_CHAIN_ROOT_MODULE_NAME
-                    .iter()
-                    .chain([DEFAULT_CHAIN_MODULE_NAME].iter()),
-            ),
-            custom_module_imports: DEFAULT_CHAIN_MODULE_IMPORTS
-                .iter()
-                .map(|(path, ty)| (path.to_string(), ty.to_string()))
-                .collect(),
-            error_type: DEFAULT_CHAIN_ERROR_TYPE.to_string(),
+            module_name: FullyQualifiedName::new_n(DEFAULT_CHAIN_ROOT_MODULE_NAME.iter()),
+            custom_module_imports: vec![],
+            error_type: FullyQualifiedName::new_n(DEFAULT_CHAIN_ERROR_TYPE.iter()),
         }
+    }
+}
+
+#[derive(Default)]
+pub struct ImportScope {
+    fixed: Vec<(String, String)>,
+    import_error_type: bool,
+    used: bool,
+}
+
+impl ImportScope {
+    pub fn add_import(&mut self, path: &str, ty: &str) {
+        self.fixed.push((path.to_string(), ty.to_string()));
+    }
+
+    pub fn add_import_with_error_type(&mut self, path: &str, ty: &str) {
+        self.add_import(path, ty);
+        self.add_error_type();
+    }
+
+    pub fn add_error_type(&mut self) {
+        self.import_error_type = true;
+    }
+
+    pub fn import(mut self, scope: &mut Scope, customizer: &ChainCustomizer) {
+        for (path, ty) in &self.fixed {
+            scope.import(path, ty);
+        }
+        if self.import_error_type {
+            scope.import(&customizer.error_type_path(), &customizer.error_type_name());
+        }
+        self.used = true;
+    }
+}
+
+impl Drop for ImportScope {
+    fn drop(&mut self) {
+        assert!(self.used);
     }
 }
 

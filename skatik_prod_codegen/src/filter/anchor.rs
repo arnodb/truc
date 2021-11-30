@@ -1,5 +1,5 @@
 use crate::{
-    chain::Chain,
+    chain::{Chain, ImportScope},
     dyn_node,
     graph::{DynNode, Graph, GraphBuilder, Node},
     stream::{NodeStream, NodeStreamSource},
@@ -35,6 +35,8 @@ impl Node<1, 1> for Anchorize {
             graph.chain_customizer(),
             thread.thread_id,
         );
+        let mut import_scope = ImportScope::default();
+        import_scope.add_import_with_error_type("streamink::stream::sync", "SyncStream");
         let node_fn = scope
             .new_fn(local_name)
             .vis("pub")
@@ -43,7 +45,11 @@ impl Node<1, 1> for Anchorize {
                 format!("&mut thread_{}::ThreadControl", thread.thread_id),
             )
             .ret(def.impl_sync_stream);
-        let input = thread.format_input(self.inputs[0].source(), graph.chain_customizer());
+        let input = thread.format_input(
+            self.inputs[0].source(),
+            graph.chain_customizer(),
+            &mut import_scope,
+        );
         crate::chain::fn_body(
             format!(
                 r#"let mut seq: usize = 0;
@@ -67,6 +73,7 @@ input
             ),
             node_fn,
         );
+        import_scope.import(scope, graph.chain_customizer());
 
         chain.update_thread_single_stream(thread.thread_id, &self.outputs[0]);
     }
@@ -95,7 +102,7 @@ pub fn anchorize(
             DatumDefinitionOverride {
                 type_name: Some(format!("skatik_prod_data::AnchorId<{}>", anchor_table_id)),
                 size: None,
-                allow_uninit: None,
+                allow_uninit: Some(true),
             },
         );
         stream.close_record_variant()

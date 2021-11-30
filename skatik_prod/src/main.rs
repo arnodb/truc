@@ -3,6 +3,8 @@ extern crate static_assertions;
 
 #[allow(dead_code)]
 #[allow(clippy::borrowed_box)]
-mod truc;
+mod chain;
 
-fn main() {}
+fn main() {
+    chain::main().unwrap();
+}

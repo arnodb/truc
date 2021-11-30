@@ -68,8 +68,10 @@ move || {
                 .get_datum_definition(d)
                 .unwrap_or_else(|| panic!("datum #{}", d));
             node_fn.line(format!(
-                "        let {name} = record.{name}().clone();",
-                name = datum.name()
+                "        let {name} = {deref}record.{name}(){clone};",
+                name = datum.name(),
+                deref = if datum.allow_uninit() { "*" } else { "" },
+                clone = if datum.allow_uninit() { "" } else { ".clone()" },
             ));
         }
         let def_1 =

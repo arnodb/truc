@@ -1,5 +1,5 @@
 use crate::{
-    chain::Chain,
+    chain::{Chain, ImportScope},
     dyn_node,
     graph::{DynNode, Graph, GraphBuilder, Node},
     stream::NodeStream,
@@ -30,6 +30,7 @@ impl Node<1, 0> for Sink {
             graph.chain_customizer(),
             thread.thread_id,
         );
+        let mut import_scope = ImportScope::default();
         let node_fn = scope
             .new_fn(local_name)
             .vis("pub")
@@ -38,7 +39,11 @@ impl Node<1, 0> for Sink {
                 format!("&mut thread_{}::ThreadControl", thread.thread_id),
             )
             .ret("impl FnOnce() -> Result<(), SkatikError>");
-        let input = thread.format_input(self.inputs[0].source(), graph.chain_customizer());
+        let input = thread.format_input(
+            self.inputs[0].source(),
+            graph.chain_customizer(),
+            &mut import_scope,
+        );
         crate::chain::fn_body(
             format!(
                 r#"{input}
@@ -65,6 +70,7 @@ move || {{
             ),
             node_fn,
         );
+        import_scope.import(scope, graph.chain_customizer());
 
         chain.set_thread_main(thread.thread_id, self.name.clone());
     }
