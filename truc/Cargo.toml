@@ -2,6 +2,11 @@
 name = "truc"
 version = "0.1.0"
 edition = "2021"
+license-file = "../LICENSE"
+description = "Stuff"
+documentation = "https://docs.rs/truc"
+repository = "https://github.com/arnodb/truc"
+readme = "../README.md"
 
 [dependencies]
 codegen = "0.1"

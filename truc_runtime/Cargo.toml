@@ -2,5 +2,10 @@
 name = "truc_runtime"
 version = "0.1.0"
 edition = "2021"
+license-file = "../LICENSE"
+description = "Stuff"
+documentation = "https://docs.rs/truc_runtime"
+repository = "https://github.com/arnodb/truc"
+readme = "../README.md"
 
 [dependencies]
