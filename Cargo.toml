@@ -1,11 +1,5 @@
 [workspace]
 members = [
-    "streamink",
     "truc",
     "truc_runtime",
-    "machin_data",
-    "machin",
-    "skatik_prod_codegen",
-    "skatik_prod_data",
-    "skatik_prod"
 ]

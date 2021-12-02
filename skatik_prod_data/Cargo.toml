@@ -1,8 +1,0 @@
-[package]
-name = "skatik_prod_data"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-derive-new = "0.5"
-thiserror = "1"
