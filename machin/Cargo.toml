@@ -5,11 +5,8 @@ edition = "2021"
 
 [dependencies]
 assert_matches = "1"
-derive-new = "0.5"
-itertools = "0.10"
 machin_data = { path = "../machin_data" }
 static_assertions = "1"
-streamink = { path = "../streamink" }
 truc_runtime = { path = "../truc_runtime" }
 
 [build-dependencies]

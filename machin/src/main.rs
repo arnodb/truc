@@ -1,12 +1,7 @@
 #[macro_use]
 extern crate assert_matches;
 #[macro_use]
-extern crate derive_new;
-#[macro_use]
 extern crate static_assertions;
-
-use itertools::Itertools;
-use streamink::{group::Group, io::buf::LineStream, sort::SyncSort, stream::sync::SyncStream};
 
 #[allow(dead_code)]
 #[allow(clippy::borrowed_box)]
@@ -128,117 +123,7 @@ fn machin() {
     );
 }
 
-pub mod ifc {
-    pub mod chain_1 {
-        use crate::truc::index_first_char::def_1::*;
-        use std::collections::VecDeque;
-        use streamink::stream::sync::SyncStream;
-
-        #[derive(new)]
-        pub struct Splitter<I: SyncStream<Item = Record0<MAX_SIZE>, Error = E>, E> {
-            input: I,
-            #[new(default)]
-            buffer: VecDeque<Box<str>>,
-            _e: std::marker::PhantomData<E>,
-        }
-
-        impl<I: SyncStream<Item = Record0<MAX_SIZE>, Error = E>, E> SyncStream for Splitter<I, E> {
-            type Item = Record1<MAX_SIZE>;
-            type Error = E;
-
-            fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
-                self.buffer.pop_front().map_or_else(
-                    || loop {
-                        let record_0 = if let Some(rec) = self.input.next()? {
-                            rec
-                        } else {
-                            return Ok(None);
-                        };
-                        let mut words = record_0.words().split_whitespace();
-                        if let Some(first) = words.next() {
-                            for w in words {
-                                self.buffer.push_back(w.into())
-                            }
-                            return Ok(Some(Record1::new(UnpackedRecord1 { word: first.into() })));
-                        }
-                    },
-                    |word| Ok(Some(Record1::new(UnpackedRecord1 { word }))),
-                )
-            }
-        }
-    }
-}
-
-fn index_first_char() -> Result<(), String> {
-    let input = std::io::stdin();
-    let lines = LineStream::new(input.lock())
-        .map_err(|err| err.to_string())
-        .and_then_map(|line| -> Result<_, String> {
-            Ok(crate::truc::index_first_char::def_1::Record0::<
-                { crate::truc::index_first_char::def_1::MAX_SIZE },
-            >::new(
-                crate::truc::index_first_char::def_1::UnpackedRecord0 { words: line },
-            ))
-        });
-    let splitted = ifc::chain_1::Splitter::new(lines).and_then_map(|rec| {
-        let first_char = rec.word().chars().next().expect("first char");
-        Ok(crate::truc::index_first_char::def_1::Record2::from((
-            rec,
-            crate::truc::index_first_char::def_1::UnpackedRecordIn2 { first_char },
-        )))
-    });
-    let sorted = SyncSort::new(splitted, |r1, r2| {
-        r1.first_char()
-            .cmp(r2.first_char())
-            .then_with(|| r1.word().cmp(r2.word()))
-    });
-    let grouped = Group::new(
-        sorted,
-        |rec| {
-            let crate::truc::index_first_char::def_1::UnpackedRecord2 { first_char, word } =
-                rec.unpack();
-            crate::truc::index_first_char::def_1::Record3::<
-                { crate::truc::index_first_char::def_1::MAX_SIZE },
-            >::new(crate::truc::index_first_char::def_1::UnpackedRecord3 {
-                first_char,
-                words: vec![crate::truc::index_first_char::def_2::Record0::new(
-                    crate::truc::index_first_char::def_2::UnpackedRecord0 { word },
-                )],
-            })
-        },
-        |group, rec| group.first_char() == rec.first_char(),
-        |group, rec| {
-            let crate::truc::index_first_char::def_1::UnpackedRecord2 {
-                first_char: _,
-                word,
-            } = rec.unpack();
-            group
-                .words_mut()
-                .push(crate::truc::index_first_char::def_2::Record0::new(
-                    crate::truc::index_first_char::def_2::UnpackedRecord0 { word },
-                ));
-        },
-    );
-    for word in grouped.transpose() {
-        let word = word?;
-        println!(
-            "{} - {}",
-            word.first_char(),
-            format!(
-                "[{}]",
-                word.words()
-                    .iter()
-                    .map(crate::truc::index_first_char::def_2::Record0::word)
-                    .join(", ")
-            )
-        );
-    }
-
-    Ok(())
-}
-
 fn main() -> Result<(), String> {
     machin();
-    index_first_char()?;
     Ok(())
 }
