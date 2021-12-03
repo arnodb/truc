@@ -1,6 +1,6 @@
 [package]
 name = "truc"
-version = "0.1.0"
+version = "0.1.1-dev"
 edition = "2021"
 license-file = "../LICENSE"
 description = "Stuff"
@@ -16,4 +16,4 @@ itertools = "0.10"
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "1", features = ["full", "extra-traits"] }
-truc_runtime = { version = "0.1.0", path = "../truc_runtime" }
+truc_runtime = { version = "0.1.1-dev", path = "../truc_runtime" }
