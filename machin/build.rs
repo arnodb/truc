@@ -65,10 +65,7 @@ fn index_first_char() {
     def_1.add_datum_override::<Vec<()>, _>(
         "words",
         DatumDefinitionOverride {
-            type_name: Some(format!(
-                "Vec<super::def_2::Record{}<{{ super::def_2::MAX_SIZE }}>>",
-                group
-            )),
+            type_name: Some(format!("Vec<super::def_2::Record{}>", group)),
             size: None,
             allow_uninit: None,
         },

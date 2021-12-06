@@ -11,7 +11,7 @@ fn machin() {
     use crate::truc::*;
     use machin_data::MachinEnum;
 
-    let record_4 = Record4::<MAX_SIZE>::new(UnpackedRecord4 {
+    let record_4 = Record4::new(UnpackedRecord4 {
         datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,
         datum_c: 0b_0100_0100_0100_0100_0100_0100_0100_0100,
         datum_d: 0b_0101_0101,
@@ -27,7 +27,7 @@ fn machin() {
     assert_eq!(*record_4.datum_f(), 0x88888888);
     assert_matches!(record_4.machin_enum(), &MachinEnum::Number(42000000000));
 
-    let mut record_4 = Record4::<MAX_SIZE>::from(UnpackedUninitRecord4 {
+    let mut record_4 = Record4::from(UnpackedUninitRecord4 {
         machin_enum: MachinEnum::Text("Hello World!".to_string()),
     });
 
@@ -47,7 +47,7 @@ fn machin() {
         MachinEnum::Text(text) if text.as_str() == "Hello World!"
     );
 
-    let mut record_0 = Record0::<MAX_SIZE>::new(UnpackedRecord0 {
+    let mut record_0 = Record0::new(UnpackedRecord0 {
         datum_a: 1,
         datum_b: 2,
     });

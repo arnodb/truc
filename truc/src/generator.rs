@@ -58,30 +58,31 @@ This is to be used in custom allocators."#,
             })
             .collect::<Vec<_>>();
 
+        let capped_record_name = format!("CappedRecord{}", variant.id());
         let record_name = format!("Record{}", variant.id());
         let unpacked_record_name = format!("UnpackedRecord{}", variant.id());
         let unpacked_uninit_record_name = format!("UnpackedUninitRecord{}", variant.id());
         let unpacked_uninit_safe_record_name = format!("UnpackedUninitSafeRecord{}", variant.id());
 
-        let (minus_data, plus_data) = if let Some((prev_variant, _prev_record_name)) = &prev_variant
-        {
-            prev_variant
-                .data()
-                .sorted()
-                .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
-                .filter_map(|either| match either {
-                    EitherOrBoth::Left(left_id) => Some(Either::Left(
-                        definition
-                            .get_datum_definition(left_id)
-                            .unwrap_or_else(|| panic!("datum #{}", left_id)),
-                    )),
-                    EitherOrBoth::Right(right) => Some(Either::Right(right)),
-                    EitherOrBoth::Both(_, _) => None,
-                })
-                .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e)
-        } else {
-            (Vec::new(), data.clone())
-        };
+        let (minus_data, plus_data) =
+            if let Some((prev_variant, _prev_capped_record_name)) = &prev_variant {
+                prev_variant
+                    .data()
+                    .sorted()
+                    .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
+                    .filter_map(|either| match either {
+                        EitherOrBoth::Left(left_id) => Some(Either::Left(
+                            definition
+                                .get_datum_definition(left_id)
+                                .unwrap_or_else(|| panic!("datum #{}", left_id)),
+                        )),
+                        EitherOrBoth::Right(right) => Some(Either::Right(right)),
+                        EitherOrBoth::Both(_, _) => None,
+                    })
+                    .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e)
+            } else {
+                (Vec::new(), data.clone())
+            };
         for datum in &plus_data {
             type_size_assertions.insert((datum.type_name(), datum.size()));
         }
@@ -137,7 +138,7 @@ using it."#,
         };
 
         let record = scope
-            .new_struct(&record_name)
+            .new_struct(&capped_record_name)
             .vis("pub")
             .generic(CAP_GENERIC);
         record.field("data", &uninit_type);
@@ -160,19 +161,27 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
             ));
         }
 
+        scope.raw(&format!(
+            r#"/// Record variant #{} with optimized capacity.
+pub type {} = {}<{{ MAX_SIZE }}>;"#,
+            variant.id(),
+            record_name,
+            capped_record_name,
+        ));
+
         generate_record_impl(
             RecordImplRecordNames {
-                name: &record_name,
+                name: &capped_record_name,
                 unpacked: &unpacked_record_name,
             },
             &unpacked_uninit_info,
             &data,
             &mut scope,
         );
-        generate_drop_impl(&record_name, &data, &mut scope);
+        generate_drop_impl(&capped_record_name, &data, &mut scope);
         generate_from_constructor_record_impl(
             RecordImplRecordNames {
-                name: &record_name,
+                name: &capped_record_name,
                 unpacked: &unpacked_record_name,
             },
             false,
@@ -180,13 +189,13 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
         );
         generate_from_constructor_record_impl(
             RecordImplRecordNames {
-                name: &record_name,
+                name: &capped_record_name,
                 unpacked: &unpacked_uninit_record_name,
             },
             true,
             &mut scope,
         );
-        if let Some((prev_variant, prev_record_name)) = &prev_variant {
+        if let Some((prev_variant, prev_capped_record_name)) = &prev_variant {
             let plus_record_name = format!("UnpackedRecordIn{}", variant.id());
             let uninit_plus_record_name = format!("UnpackedUninitRecordIn{}", variant.id());
             let uninit_safe_plus_record_name =
@@ -251,15 +260,15 @@ It contains all the removed data so that one can still use them, or drop them."#
                         variant.id()
                     )),
                 },
-                &record_name,
+                &capped_record_name,
                 &minus_data,
                 &mut scope,
             );
 
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
-                    name: &record_name,
-                    prev: prev_record_name,
+                    name: &capped_record_name,
+                    prev: prev_capped_record_name,
                     plus: &plus_record_name,
                     and_out: None,
                 },
@@ -270,8 +279,8 @@ It contains all the removed data so that one can still use them, or drop them."#
             );
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
-                    name: &record_name,
-                    prev: prev_record_name,
+                    name: &capped_record_name,
+                    prev: prev_capped_record_name,
                     plus: &uninit_plus_record_name,
                     and_out: None,
                 },
@@ -283,8 +292,8 @@ It contains all the removed data so that one can still use them, or drop them."#
 
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
-                    name: &record_name,
-                    prev: prev_record_name,
+                    name: &capped_record_name,
+                    prev: prev_capped_record_name,
                     plus: &plus_record_name,
                     and_out: Some(&and_out_record_name),
                 },
@@ -296,8 +305,8 @@ It contains all the removed data so that one can still use them, or drop them."#
 
             generate_from_previous_record_impl(
                 RecordFromPreviousRecordNames {
-                    name: &record_name,
-                    prev: prev_record_name,
+                    name: &capped_record_name,
+                    prev: prev_capped_record_name,
                     plus: &uninit_plus_record_name,
                     and_out: Some(&and_out_record_name),
                 },
@@ -308,7 +317,7 @@ It contains all the removed data so that one can still use them, or drop them."#
             );
         }
 
-        prev_variant = Some((variant, record_name));
+        prev_variant = Some((variant, capped_record_name));
     }
 
     // This checks there is no type substitution which could lead to unsafe
