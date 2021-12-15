@@ -11,6 +11,8 @@ fn machin() {
     use crate::truc::*;
     use machin_data::MachinEnum;
 
+    assert_eq!(MAX_SIZE, 72);
+
     let record_4 = Record4::new(UnpackedRecord4 {
         datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,
         datum_c: 0b_0100_0100_0100_0100_0100_0100_0100_0100,
