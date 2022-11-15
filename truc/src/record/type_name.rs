@@ -154,12 +154,10 @@ fn rewrite_type(syn_type: &mut syn::Type) {
         syn::Type::Verbatim(_) => {
             unimplemented!("{:?}", syn_type);
         }
-        #[cfg(test)]
-        syn::Type::__TestExhaustive(_) => {
+        #[cfg_attr(all(test, nightly), deny(non_exhaustive_omitted_patterns))]
+        _ => {
             unimplemented!("{:?}", syn_type);
         }
-        #[cfg(not(test))]
-        _ => {}
     }
 }
 
