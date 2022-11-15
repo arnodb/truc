@@ -288,6 +288,13 @@ impl RecordDefinitionBuilder {
     }
 
     pub fn close_record_variant(&mut self) -> RecordVariantId {
+        if !self.variants.is_empty()
+            && self.data_to_remove.is_empty()
+            && self.data_to_add.is_empty()
+        {
+            return (self.variants.len() - 1).into();
+        }
+
         let mut data = self
             .variants
             .last()

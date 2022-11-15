@@ -23,6 +23,7 @@ fn machin() {
     let e3 = definition.add_datum_allow_uninit::<u16, _>("datum_e");
     let f3 = definition.add_datum_allow_uninit::<u32, _>("datum_f");
     definition.close_record_variant();
+    definition.close_record_variant();
 
     let machin_enum = definition.add_datum::<MachinEnum, _>("machin_enum");
     definition.close_record_variant();
