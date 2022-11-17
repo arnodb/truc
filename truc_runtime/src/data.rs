@@ -84,9 +84,8 @@ fn test_record_write_read_drop() {
     unsafe {
         record.write(0, Foo {});
     }
-    let _foo = unsafe {
-        record.read::<Foo>(0);
-    };
+    let foo = unsafe { record.read::<Foo>(0) };
+    drop(foo);
 
     let counter = unsafe { COUNTER };
     assert_eq!(counter, 1);

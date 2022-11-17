@@ -596,7 +596,7 @@ fn generate_from_previous_record_impl(
     }
     from_fn.line("let manually_drop = std::mem::ManuallyDrop::new(from);");
     from_fn.line(format!(
-        "let {}data = unsafe {{ std::ptr::read(&(*manually_drop).data) }};",
+        "let {}data = unsafe {{ std::ptr::read(&manually_drop.data) }};",
         if uninit.is_none() && plus_has_data || uninit.is_some() && uninit_plus_has_data {
             "mut "
         } else {

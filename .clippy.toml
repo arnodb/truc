@@ -1,0 +1,2 @@
+msrv = "1.56.1"
+blacklisted-names = []
