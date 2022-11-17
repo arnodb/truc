@@ -1,3 +1,5 @@
+#![cfg_attr(test, allow(clippy::many_single_char_names))]
+
 #[macro_use]
 extern crate derive_more;
 #[macro_use]
