@@ -180,6 +180,20 @@ impl RecordDefinition {
     pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
         self.variants.get(id.0)
     }
+
+    pub fn max_type_align(&self) -> usize {
+        self.datum_definitions()
+            .map(|d| d.type_align())
+            .reduce(usize::max)
+            .unwrap_or(0)
+    }
+
+    pub fn max_size(&self) -> usize {
+        self.datum_definitions()
+            .map(|d| d.offset() + d.size())
+            .max()
+            .unwrap_or(0)
+    }
 }
 
 impl Display for RecordDefinition {
@@ -469,7 +483,9 @@ mod tests {
                 add_one(&mut definition, &mut rng, num_data + i);
             }
             let def = definition.build();
+            let max_size = def.max_size();
             for datum in def.datum_definitions() {
+                assert!(datum.offset + datum.size <= max_size);
                 assert_eq!(
                     datum.offset() % datum.type_align(),
                     0,
@@ -477,6 +493,13 @@ mod tests {
                     def,
                     datum
                 );
+            }
+            for v in def.variants() {
+                for w in v.data.as_slice().windows(2) {
+                    let datum1 = def.get_datum_definition(w[0]).unwrap();
+                    let datum2 = def.get_datum_definition(w[1]).unwrap();
+                    assert!(datum1.offset + datum1.size <= datum2.offset);
+                }
             }
         }
     }

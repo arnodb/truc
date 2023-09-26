@@ -14,17 +14,8 @@ pub fn generate(definition: &RecordDefinition) -> String {
     let mut uninit_type = Type::new("RecordMaybeUninit");
     uninit_type.generic(CAP);
 
-    let max_type_align = definition
-        .datum_definitions()
-        .map(|d| d.type_align())
-        .reduce(usize::max)
-        .unwrap_or(0);
-
-    let max_size = definition
-        .datum_definitions()
-        .map(|d| d.offset() + d.size())
-        .max()
-        .unwrap_or(0);
+    let max_type_align = definition.max_type_align();
+    let max_size = definition.max_size();
 
     scope.raw(&format!(
         r#"/// Maximum size of the record, regardless of the record variant.
