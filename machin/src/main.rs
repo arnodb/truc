@@ -44,10 +44,11 @@ fn machin() {
     assert_eq!(*record_4.datum_d(), 0x55);
     assert_eq!(*record_4.datum_e(), 0x1111);
     assert_eq!(*record_4.datum_f(), 0x88888888);
-    assert_matches!(
+    let text = assert_matches!(
         record_4.machin_enum(),
-        MachinEnum::Text(text) if text.as_str() == "Hello World!"
+        MachinEnum::Text(text) => text
     );
+    assert_eq!(text.as_str(), "Hello World!");
 
     let mut record_0 = Record0::new(UnpackedRecord0 {
         datum_a: 1,
@@ -105,10 +106,11 @@ fn machin() {
     assert_eq!(*record_4.datum_d(), 4);
     assert_eq!(*record_4.datum_e(), 5);
     assert_eq!(*record_4.datum_f(), 6);
-    assert_matches!(
+    let text = assert_matches!(
         record_4.machin_enum(),
-        MachinEnum::Text(text) if text.as_str() == "Foo"
+        MachinEnum::Text(text) => text
     );
+    assert_eq!(text.as_str(), "Foo");
 
     let record_5 = Record5::from((
         record_4,
