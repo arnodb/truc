@@ -20,5 +20,5 @@ syn = { version = "1", features = ["full", "extra-traits"] }
 truc_runtime = { version = "0.1.1-dev", path = "../truc_runtime" }
 
 [dev-dependencies]
-arbitrary = { version = "1", features = ["derive"] }
-arbtest = "0.2"
+rand = "0.8"
+rand_chacha = "0.3"

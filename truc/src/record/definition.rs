@@ -429,35 +429,32 @@ impl Default for RecordDefinitionBuilder {
 #[cfg(test)]
 mod tests {
     use crate::record::definition::RecordDefinitionBuilder;
-    use arbitrary::Arbitrary;
+    use rand::Rng;
+    use rand_chacha::rand_core::SeedableRng;
 
     #[test]
     fn should_align_offsets_according_to_rust_alignment_rules() {
-        arbtest::builder().run(|u| {
+        let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
+        println!("Seed: {:02x?}", rng.get_seed());
+        const MAX_DATA: usize = 32;
+        for _ in 0..256 {
             let mut definition = RecordDefinitionBuilder::new();
-            #[derive(Arbitrary)]
-            enum Type {
-                U8,
-                U16,
-                U32,
-                U64,
-            }
-            const MAX_DATA: usize = 32;
-            for i in 0..u.int_in_range(0..=MAX_DATA)? {
-                let r#type = u.arbitrary::<Type>()?;
-                match r#type {
-                    Type::U8 => {
+            let num_data = rng.gen_range(0..=MAX_DATA);
+            for i in 0..num_data {
+                match rng.gen_range(0..4) {
+                    0 => {
                         definition.add_datum::<u8, _>(format!("field_{}", i));
                     }
-                    Type::U16 => {
+                    1 => {
                         definition.add_datum::<u16, _>(format!("field_{}", i));
                     }
-                    Type::U32 => {
+                    2 => {
                         definition.add_datum::<u32, _>(format!("field_{}", i));
                     }
-                    Type::U64 => {
+                    3 => {
                         definition.add_datum::<u64, _>(format!("field_{}", i));
                     }
+                    i => unreachable!("Unhandled value {}", i),
                 }
             }
             let def = definition.build();
@@ -470,8 +467,6 @@ mod tests {
                     datum.name()
                 );
             }
-
-            Ok(())
-        })
+        }
     }
 }
