@@ -41,7 +41,7 @@ fn machin() {
 
     let out_dir = env::var("OUT_DIR").unwrap();
     let dest = Path::new(&out_dir);
-    let mut file = File::create(&dest.join("machin_truc.rs")).unwrap();
+    let mut file = File::create(dest.join("machin_truc.rs")).unwrap();
     write!(file, "{}", generate(&definition)).unwrap();
 }
 
@@ -76,11 +76,11 @@ fn index_first_char() {
     let dest = Path::new(&out_dir);
 
     let def_1 = def_1.build();
-    let mut file = File::create(&dest.join("index_first_char_1.rs")).unwrap();
+    let mut file = File::create(dest.join("index_first_char_1.rs")).unwrap();
     write!(file, "{}", generate(&def_1)).unwrap();
 
     let def_2 = def_2.build();
-    let mut file = File::create(&dest.join("index_first_char_2.rs")).unwrap();
+    let mut file = File::create(dest.join("index_first_char_2.rs")).unwrap();
     write!(file, "{}", generate(&def_2)).unwrap();
 }
 
