@@ -14,6 +14,12 @@ pub fn generate(definition: &RecordDefinition) -> String {
     let mut uninit_type = Type::new("RecordMaybeUninit");
     uninit_type.generic(CAP);
 
+    let max_type_align = definition
+        .datum_definitions()
+        .map(|d| d.type_align())
+        .reduce(usize::max)
+        .unwrap_or(0);
+
     let max_size = definition
         .datum_definitions()
         .map(|d| d.offset() + d.size())
@@ -30,6 +36,7 @@ pub const MAX_SIZE: usize = {};"#,
 
     let record_uninit = scope
         .new_struct("RecordUninitialized")
+        .repr(&format!("align({})", max_type_align))
         .vis("pub")
         .generic(CAP_GENERIC);
     record_uninit.field("_data", &uninit_type);
@@ -139,6 +146,7 @@ using it."#,
 
         let record = scope
             .new_struct(&capped_record_name)
+            .repr(&format!("align({})", max_type_align))
             .vis("pub")
             .generic(CAP_GENERIC);
         record.field("data", &uninit_type);

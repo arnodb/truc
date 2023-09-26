@@ -38,12 +38,36 @@ mod tests {
         assert_eq!(
             def,
             format!(
-                r#"{} [{} (u32, 4), {} (u32, 4)]
-{} [{} (u32, 4), {} (u32, 4), {} (u32, 4)]
-{} [(void, 4), {} (u32, 4), {} (u32, 4)]
-{} [{} (u8, 1), {} (u16, 2), (void, 1), {} (u32, 4), {} (u32, 4), {} (u32, 4)]
-"#,
-                rv1, a, b, rv2, a, b, c, rv3, b, c, rv4, d, e, b, c, f
+                concat!(
+                    // rv1
+                    "{} [",
+                    "{}: a (u32, align 4, offset 0, size 4), ",
+                    "{}: b (u32, align 4, offset 4, size 4)",
+                    "]\n",
+                    // rv2
+                    "{} [",
+                    "{}: a (u32, align 4, offset 0, size 4), ",
+                    "{}: b (u32, align 4, offset 4, size 4), ",
+                    "{}: c (u32, align 4, offset 8, size 4)",
+                    "]\n",
+                    // rv3
+                    "{} [",
+                    "(void, 4), ",
+                    "{}: b (u32, align 4, offset 4, size 4), ",
+                    "{}: c (u32, align 4, offset 8, size 4)",
+                    "]\n",
+                    // rv4
+                    "{} [",
+                    "{}: d (u8, align 1, offset 0, size 1), ",
+                    "(void, 3), ",
+                    "{}: b (u32, align 4, offset 4, size 4), ",
+                    "{}: c (u32, align 4, offset 8, size 4), ",
+                    "{}: e (u16, align 2, offset 12, size 2), ",
+                    "(void, 2), ",
+                    "{}: f (u32, align 4, offset 16, size 4)",
+                    "]\n"
+                ),
+                rv1, a, b, rv2, a, b, c, rv3, b, c, rv4, d, b, c, e, f,
             )
         );
     }

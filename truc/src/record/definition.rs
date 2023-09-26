@@ -1,5 +1,8 @@
 use crate::record::type_name::truc_type_name;
-use std::fmt::{Display, Formatter};
+use std::{
+    fmt::{Display, Formatter},
+    mem::align_of,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
@@ -11,6 +14,7 @@ pub struct DatumDefinition {
     offset: usize,
     size: usize,
     type_name: String,
+    type_align: usize,
     allow_uninit: bool,
 }
 
@@ -35,6 +39,10 @@ impl DatumDefinition {
         &self.type_name
     }
 
+    pub fn type_align(&self) -> usize {
+        self.type_align
+    }
+
     pub fn allow_uninit(&self) -> bool {
         self.allow_uninit
     }
@@ -42,7 +50,11 @@ impl DatumDefinition {
 
 impl Display for DatumDefinition {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({}, {})", self.id, self.type_name, self.size)?;
+        write!(
+            f,
+            "{}: {} ({}, align {}, offset {}, size {})",
+            self.id, self.name, self.type_name, self.type_align, self.offset, self.size
+        )?;
         Ok(())
     }
 }
@@ -71,10 +83,12 @@ impl DatumDefinitionCollection {
         offset: usize,
         size: usize,
         type_name: String,
+        type_align: usize,
         allow_uninit: bool,
     ) -> DatumId {
         let id = DatumId::from(self.data.len());
-        let datum = DatumDefinition::new(id, name, offset, size, type_name, allow_uninit);
+        let datum =
+            DatumDefinition::new(id, name, offset, size, type_name, type_align, allow_uninit);
         self.data.push(datum);
         id
     }
@@ -210,6 +224,7 @@ impl RecordDefinitionBuilder {
             std::usize::MAX,
             std::mem::size_of::<T>(),
             truc_type_name::<T>(),
+            align_of::<T>(),
             false,
         );
         self.data_to_add.push(datum_id);
@@ -226,6 +241,7 @@ impl RecordDefinitionBuilder {
             std::usize::MAX,
             std::mem::size_of::<T>(),
             truc_type_name::<T>(),
+            align_of::<T>(),
             true,
         );
         self.data_to_add.push(datum_id);
@@ -245,6 +261,7 @@ impl RecordDefinitionBuilder {
             std::usize::MAX,
             datum_override.size.unwrap_or_else(std::mem::size_of::<T>),
             datum_override.type_name.unwrap_or_else(truc_type_name::<T>),
+            align_of::<T>(),
             datum_override.allow_uninit.unwrap_or(false),
         );
         self.data_to_add.push(datum_id);
@@ -257,6 +274,7 @@ impl RecordDefinitionBuilder {
             std::usize::MAX,
             datum.size(),
             datum.type_name().to_string(),
+            datum.type_align(),
             datum.allow_uninit(),
         );
         self.data_to_add.push(datum_id);
@@ -313,6 +331,8 @@ impl RecordDefinitionBuilder {
         // Then add
         let mut data_caret = 0;
         let mut byte_caret = 0;
+        let align_bytes =
+            |caret: usize, align: usize| -> usize { (caret + align - 1) / align * align };
         for &datum_id in &self.data_to_add {
             let datum = self
                 .datum_definitions
@@ -327,13 +347,20 @@ impl RecordDefinitionBuilder {
                 if caret_datum.offset == byte_caret {
                     data_caret += 1;
                     byte_caret += caret_datum.size;
-                } else if byte_caret + datum.size < caret_datum.offset {
-                    break;
                 } else {
-                    data_caret += 1;
-                    byte_caret = caret_datum.offset + caret_datum.size;
+                    {
+                        let bc = align_bytes(byte_caret, datum.type_align);
+                        if bc + datum.size < caret_datum.offset {
+                            byte_caret = bc;
+                            break;
+                        } else {
+                            data_caret += 1;
+                            byte_caret = caret_datum.offset + caret_datum.size;
+                        }
+                    }
                 }
             }
+            byte_caret = align_bytes(byte_caret, datum.type_align);
             data.insert(data_caret, datum_id);
             let datum_mut = self
                 .datum_definitions
@@ -396,5 +423,55 @@ impl RecordDefinitionBuilder {
 impl Default for RecordDefinitionBuilder {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::record::definition::RecordDefinitionBuilder;
+    use arbitrary::Arbitrary;
+
+    #[test]
+    fn should_align_offsets_according_to_rust_alignment_rules() {
+        arbtest::builder().run(|u| {
+            let mut definition = RecordDefinitionBuilder::new();
+            #[derive(Arbitrary)]
+            enum Type {
+                U8,
+                U16,
+                U32,
+                U64,
+            }
+            const MAX_DATA: usize = 32;
+            for i in 0..u.int_in_range(0..=MAX_DATA)? {
+                let r#type = u.arbitrary::<Type>()?;
+                match r#type {
+                    Type::U8 => {
+                        definition.add_datum::<u8, _>(format!("field_{}", i));
+                    }
+                    Type::U16 => {
+                        definition.add_datum::<u16, _>(format!("field_{}", i));
+                    }
+                    Type::U32 => {
+                        definition.add_datum::<u32, _>(format!("field_{}", i));
+                    }
+                    Type::U64 => {
+                        definition.add_datum::<u64, _>(format!("field_{}", i));
+                    }
+                }
+            }
+            let def = definition.build();
+            for datum in def.datum_definitions() {
+                assert_eq!(
+                    datum.offset() % datum.type_align(),
+                    0,
+                    "def {} is unaligned at field {}",
+                    def,
+                    datum.name()
+                );
+            }
+
+            Ok(())
+        })
     }
 }
