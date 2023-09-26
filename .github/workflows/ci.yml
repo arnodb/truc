@@ -29,7 +29,8 @@ jobs:
           toolchain: ${{matrix.rust}}
           components: rustfmt, clippy
 
-      - run: cargo fmt --verbose --all -- --check
+      - if: ${{ matrix.rust == 'stable' }}
+        run: cargo fmt --verbose --all -- --check
 
       - run: cargo clippy --all --all-features --all-targets -- -D warnings
 
