@@ -35,3 +35,32 @@ jobs:
       - run: cargo clippy --all --all-features --all-targets -- -D warnings
 
       - run: cargo test --verbose
+
+  cross-test:
+
+    name: Rust ${{matrix.rust}}, target ${{matrix.target}}
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [1.65.0, stable]
+        target: [i686-unknown-linux-gnu, aarch64-unknown-linux-gnu]
+
+    steps:
+
+      - uses: actions/checkout@v3
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{matrix.rust}}
+
+      - run: cargo install cross@0.2.5
+
+      - run: |
+          set -eu
+          mkdir -p "target/shared_machin/${{matrix.target}}/debug"
+          cross run --target "${{matrix.target}}" -p machin_target_types >| "target/shared_machin/${{matrix.target}}/debug/target_types.json"
+
+      - run: cross test --target ${{matrix.target}} --verbose
