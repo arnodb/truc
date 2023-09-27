@@ -19,6 +19,11 @@ fn machin() {
         datum_d: 0b_0101_0101,
         datum_e: 0b_0001_0001_0001_0001,
         datum_f: 0b_1000_1000_1000_1000_1000_1000_1000_1000,
+        #[cfg(target_pointer_width = "16")]
+        machin_enum: MachinEnum::Number(42 * 1000),
+        #[cfg(target_pointer_width = "32")]
+        machin_enum: MachinEnum::Number(42 * 1000 * 1000),
+        #[cfg(target_pointer_width = "64")]
         machin_enum: MachinEnum::Number(42 * 1000 * 1000 * 1000),
     });
 
@@ -27,6 +32,11 @@ fn machin() {
     assert_eq!(*record_4.datum_d(), 0x55);
     assert_eq!(*record_4.datum_e(), 0x1111);
     assert_eq!(*record_4.datum_f(), 0x88888888);
+    #[cfg(target_pointer_width = "16")]
+    assert_matches!(record_4.machin_enum(), &MachinEnum::Number(42000));
+    #[cfg(target_pointer_width = "32")]
+    assert_matches!(record_4.machin_enum(), &MachinEnum::Number(42000000));
+    #[cfg(target_pointer_width = "64")]
     assert_matches!(record_4.machin_enum(), &MachinEnum::Number(42000000000));
 
     let mut record_4 = Record4::from(UnpackedUninitRecord4 {

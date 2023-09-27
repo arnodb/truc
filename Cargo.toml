@@ -3,5 +3,6 @@ members = [
     "truc",
     "truc_runtime",
     "machin_data",
+    "machin_target_types",
     "machin",
 ]
