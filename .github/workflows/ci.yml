@@ -48,6 +48,9 @@ jobs:
         rust: [1.65.0, stable]
         target: [i686-unknown-linux-gnu, aarch64-unknown-linux-gnu]
 
+    env:
+      TRUC_CROSS: yes
+
     steps:
 
       - uses: actions/checkout@v3
@@ -63,4 +66,4 @@ jobs:
           mkdir -p "target/shared_machin/${{matrix.target}}/debug"
           cross run --target "${{matrix.target}}" -p machin_target_types >| "target/shared_machin/${{matrix.target}}/debug/target_types.json"
 
-      - run: cross test --target ${{matrix.target}} --verbose
+      - run: cross test --target ${{matrix.target}} -vv

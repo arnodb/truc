@@ -24,12 +24,14 @@ fn get_build_info() -> BuildInfo {
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR");
     let out_dir_path = PathBuf::from(out_dir);
 
+    let cross_compiling = std::env::var("TRUC_CROSS").is_ok();
+
     let host = std::env::var("HOST").expect("HOST");
     let target = std::env::var("TARGET").expect("TARGET");
 
-    let cross_compiling = target != host;
-
     if cross_compiling {
+        println!("Cross compiling for target {} on host {}", target, host);
+
         let cargo_target_dir = std::env::var("CARGO_TARGET_DIR").expect("CARGO_TARGET_DIR");
         let profile = std::env::var("PROFILE").expect("PROFILE");
 
@@ -42,6 +44,15 @@ fn get_build_info() -> BuildInfo {
             out_dir_path,
         }
     } else {
+        if host != target {
+            panic!(
+                "Cross compilation not detected for target {} on host {}",
+                target, host
+            );
+        } else {
+            println!("Compiling for target {}", target);
+        }
+
         BuildInfo {
             cross_compilation: CrossCompilation::No,
             out_dir_path,
