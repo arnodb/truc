@@ -59,11 +59,13 @@ jobs:
         with:
           toolchain: ${{matrix.rust}}
 
-      - run: cargo install cross@0.2.5
+      - run: |
+          curl -OL "https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir cross
+          tar -C cross -xvzf cross-x86_64-unknown-linux-gnu.tar.gz
 
       - run: |
-          set -eu
           mkdir -p "target/shared_machin/${{matrix.target}}/debug"
-          cross run --target "${{matrix.target}}" -p machin_target_types >| "target/shared_machin/${{matrix.target}}/debug/target_types.json"
+          ./cross/cross run --target "${{matrix.target}}" -p machin_target_types >| "target/shared_machin/${{matrix.target}}/debug/target_types.json"
 
-      - run: cross test --target ${{matrix.target}} -vv
+      - run: ./cross/cross test --target ${{matrix.target}} -vv
