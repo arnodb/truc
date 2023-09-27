@@ -211,44 +211,44 @@ where
 
 #[test]
 fn usize_type_name() {
-    assert_eq!(&truc_type_name::<usize>(), "usize");
+    assert_eq!(&*truc_type_name::<usize>(), "usize");
 }
 
 #[test]
 fn string_type_name() {
-    assert_eq!(&truc_type_name::<String>(), "String");
+    assert_eq!(&*truc_type_name::<String>(), "String");
 }
 
 #[test]
 fn box_type_name() {
-    assert_eq!(&truc_type_name::<Box<String>>(), "Box < String >");
+    assert_eq!(&*truc_type_name::<Box<String>>(), "Box < String >");
 }
 
 #[test]
 fn tuple_type_name() {
-    assert_eq!(&truc_type_name::<(usize, String)>(), "(usize , String)");
+    assert_eq!(&*truc_type_name::<(usize, String)>(), "(usize , String)");
 }
 
 #[test]
 fn option_type_name() {
-    assert_eq!(&truc_type_name::<Option<u32>>(), "Option < u32 >");
-    assert_eq!(&truc_type_name::<Option<String>>(), "Option < String >");
+    assert_eq!(&*truc_type_name::<Option<u32>>(), "Option < u32 >");
+    assert_eq!(&*truc_type_name::<Option<String>>(), "Option < String >");
 }
 
 #[test]
 fn result_type_name() {
     assert_eq!(
-        &truc_type_name::<Result<u32, String>>(),
+        &*truc_type_name::<Result<u32, String>>(),
         "Result < u32 , String >"
     );
 }
 
 #[test]
 fn array_type_name() {
-    assert_eq!(&truc_type_name::<[String; 42]>(), "[String ; 42]");
+    assert_eq!(&*truc_type_name::<[String; 42]>(), "[String ; 42]");
 }
 
 #[test]
 fn slice_type_name() {
-    assert_eq!(&truc_type_name::<[String]>(), "[String]");
+    assert_eq!(&*truc_type_name::<[String]>(), "[String]");
 }

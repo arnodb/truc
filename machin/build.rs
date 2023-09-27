@@ -5,9 +5,12 @@ use std::io::Write;
 use std::path::Path;
 use truc::generator::generate;
 use truc::record::definition::{DatumDefinitionOverride, RecordDefinitionBuilder};
+use truc::record::type_resolver::HostTypeResolver;
 
 fn machin() {
-    let mut definition = RecordDefinitionBuilder::new();
+    let type_resolver = HostTypeResolver;
+
+    let mut definition = RecordDefinitionBuilder::new(&type_resolver);
 
     let a0 = definition.add_datum_allow_uninit::<u32, _>("datum_a");
     let b0 = definition.add_datum_allow_uninit::<u32, _>("datum_b");
@@ -46,7 +49,9 @@ fn machin() {
 }
 
 fn index_first_char() {
-    let mut def_1 = RecordDefinitionBuilder::new();
+    let type_resolver = HostTypeResolver;
+
+    let mut def_1 = RecordDefinitionBuilder::new(&type_resolver);
 
     let words = def_1.add_datum::<Box<str>, _>("words");
     def_1.close_record_variant();
@@ -58,7 +63,7 @@ fn index_first_char() {
     def_1.add_datum::<char, _>("first_char");
     def_1.close_record_variant();
 
-    let mut def_2 = RecordDefinitionBuilder::new();
+    let mut def_2 = RecordDefinitionBuilder::new(&type_resolver);
     def_2.copy_datum(def_1.get_datum_definition(word).expect("datum"));
     let group = def_2.close_record_variant();
 
@@ -68,6 +73,7 @@ fn index_first_char() {
         DatumDefinitionOverride {
             type_name: Some(format!("Vec<super::def_2::Record{}>", group)),
             size: None,
+            align: None,
             allow_uninit: None,
         },
     );

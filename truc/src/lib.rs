@@ -12,11 +12,13 @@ pub mod record;
 
 #[cfg(test)]
 mod tests {
-    use crate::record::definition::RecordDefinitionBuilder;
+    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
 
     #[test]
     fn it_works() {
-        let mut definition = RecordDefinitionBuilder::new();
+        let type_resolver = HostTypeResolver;
+
+        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
 
         let a = definition.add_datum::<u32, _>("a");
         let b = definition.add_datum::<u32, _>("b");

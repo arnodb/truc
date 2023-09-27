@@ -1,8 +1,5 @@
-use crate::record::type_name::truc_type_name;
-use std::{
-    fmt::{Display, Formatter},
-    mem::align_of,
-};
+use crate::record::type_resolver::{TypeInfo, TypeResolver};
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
@@ -12,9 +9,7 @@ pub struct DatumDefinition {
     id: DatumId,
     name: String,
     offset: usize,
-    size: usize,
-    type_name: String,
-    type_align: usize,
+    type_info: TypeInfo,
     allow_uninit: bool,
 }
 
@@ -32,15 +27,19 @@ impl DatumDefinition {
     }
 
     pub fn size(&self) -> usize {
-        self.size
+        self.type_info.size
+    }
+
+    pub fn type_info(&self) -> &TypeInfo {
+        &self.type_info
     }
 
     pub fn type_name(&self) -> &str {
-        &self.type_name
+        &self.type_info.name
     }
 
     pub fn type_align(&self) -> usize {
-        self.type_align
+        self.type_info.align
     }
 
     pub fn allow_uninit(&self) -> bool {
@@ -53,7 +52,12 @@ impl Display for DatumDefinition {
         write!(
             f,
             "{}: {} ({}, align {}, offset {}, size {})",
-            self.id, self.name, self.type_name, self.type_align, self.offset, self.size
+            self.id,
+            self.name,
+            self.type_info.name,
+            self.type_info.align,
+            self.offset,
+            self.type_info.size
         )?;
         Ok(())
     }
@@ -81,14 +85,11 @@ impl DatumDefinitionCollection {
         &mut self,
         name: String,
         offset: usize,
-        size: usize,
-        type_name: String,
-        type_align: usize,
+        type_info: TypeInfo,
         allow_uninit: bool,
     ) -> DatumId {
         let id = DatumId::from(self.data.len());
-        let datum =
-            DatumDefinition::new(id, name, offset, size, type_name, type_align, allow_uninit);
+        let datum = DatumDefinition::new(id, name, offset, type_info, allow_uninit);
         self.data.push(datum);
         id
     }
@@ -127,15 +128,15 @@ impl RecordVariant {
             let datum = datum_definitions
                 .get(d)
                 .unwrap_or_else(|| panic!("datum #{}", d));
-            if byte_offset > datum.offset {
-                panic!("offset clash {} > {}", byte_offset, datum.offset);
+            if byte_offset > datum.offset() {
+                panic!("offset clash {} > {}", byte_offset, datum.offset());
             }
-            if byte_offset < datum.offset {
-                write!(f, "(void, {}), ", datum.offset - byte_offset)?;
+            if byte_offset < datum.offset() {
+                write!(f, "(void, {}), ", datum.offset() - byte_offset)?;
             }
             write!(f, "{}", datum)?;
             first = false;
-            byte_offset = datum.offset + datum.size;
+            byte_offset = datum.offset() + datum.size();
         }
         write!(f, "]")?;
         Ok(())
@@ -209,23 +210,32 @@ impl Display for RecordDefinition {
 pub struct DatumDefinitionOverride {
     pub type_name: Option<String>,
     pub size: Option<usize>,
+    pub align: Option<usize>,
     pub allow_uninit: Option<bool>,
 }
 
-pub struct RecordDefinitionBuilder {
+pub struct RecordDefinitionBuilder<R>
+where
+    R: TypeResolver,
+{
     datum_definitions: DatumDefinitionCollection,
     variants: Vec<RecordVariant>,
     data_to_add: Vec<DatumId>,
     data_to_remove: Vec<DatumId>,
+    type_resolver: R,
 }
 
-impl RecordDefinitionBuilder {
-    pub fn new() -> Self {
+impl<R> RecordDefinitionBuilder<R>
+where
+    R: TypeResolver,
+{
+    pub fn new(type_resolver: R) -> Self {
         Self {
             datum_definitions: DatumDefinitionCollection::default(),
             variants: Vec::new(),
             data_to_add: Vec::new(),
             data_to_remove: Vec::new(),
+            type_resolver,
         }
     }
 
@@ -236,9 +246,7 @@ impl RecordDefinitionBuilder {
         let datum_id = self.datum_definitions.push(
             name.into(),
             std::usize::MAX,
-            std::mem::size_of::<T>(),
-            truc_type_name::<T>(),
-            align_of::<T>(),
+            self.type_resolver.type_info::<T>(),
             false,
         );
         self.data_to_add.push(datum_id);
@@ -253,9 +261,7 @@ impl RecordDefinitionBuilder {
         let datum_id = self.datum_definitions.push(
             name.into(),
             std::usize::MAX,
-            std::mem::size_of::<T>(),
-            truc_type_name::<T>(),
-            align_of::<T>(),
+            self.type_resolver.type_info::<T>(),
             true,
         );
         self.data_to_add.push(datum_id);
@@ -273,9 +279,19 @@ impl RecordDefinitionBuilder {
         let datum_id = self.datum_definitions.push(
             name.into(),
             std::usize::MAX,
-            datum_override.size.unwrap_or_else(std::mem::size_of::<T>),
-            datum_override.type_name.unwrap_or_else(truc_type_name::<T>),
-            align_of::<T>(),
+            {
+                let mut target_info = self.type_resolver.type_info::<T>();
+                if let Some(type_name) = datum_override.type_name {
+                    target_info.name = type_name;
+                }
+                if let Some(size) = datum_override.size {
+                    target_info.size = size;
+                }
+                if let Some(align) = datum_override.align {
+                    target_info.align = align;
+                }
+                target_info
+            },
             datum_override.allow_uninit.unwrap_or(false),
         );
         self.data_to_add.push(datum_id);
@@ -286,9 +302,7 @@ impl RecordDefinitionBuilder {
         let datum_id = self.datum_definitions.push(
             datum.name().into(),
             std::usize::MAX,
-            datum.size(),
-            datum.type_name().to_string(),
-            datum.type_align(),
+            datum.type_info().clone(),
             datum.allow_uninit(),
         );
         self.data_to_add.push(datum_id);
@@ -360,21 +374,21 @@ impl RecordDefinitionBuilder {
                     .unwrap_or_else(|| panic!("datum #{}", caret_datum_id));
                 if caret_datum.offset == byte_caret {
                     data_caret += 1;
-                    byte_caret += caret_datum.size;
+                    byte_caret += caret_datum.size();
                 } else {
                     {
-                        let bc = align_bytes(byte_caret, datum.type_align);
-                        if bc + datum.size < caret_datum.offset {
+                        let bc = align_bytes(byte_caret, datum.type_align());
+                        if bc + datum.size() < caret_datum.offset {
                             byte_caret = bc;
                             break;
                         } else {
                             data_caret += 1;
-                            byte_caret = caret_datum.offset + caret_datum.size;
+                            byte_caret = caret_datum.offset + caret_datum.size();
                         }
                     }
                 }
             }
-            byte_caret = align_bytes(byte_caret, datum.type_align);
+            byte_caret = align_bytes(byte_caret, datum.type_align());
             data.insert(data_caret, datum_id);
             let datum_mut = self
                 .datum_definitions
@@ -434,15 +448,9 @@ impl RecordDefinitionBuilder {
     }
 }
 
-impl Default for RecordDefinitionBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::record::definition::RecordDefinitionBuilder;
+    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
@@ -450,11 +458,14 @@ mod tests {
     fn should_align_offsets_according_to_rust_alignment_rules() {
         let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
         println!("Seed: {:02x?}", rng.get_seed());
+
+        let type_resolver = HostTypeResolver;
+
         const MAX_DATA: usize = 32;
         for _ in 0..256 {
-            let mut definition = RecordDefinitionBuilder::new();
+            let mut definition = RecordDefinitionBuilder::new(&type_resolver);
             let num_data = rng.gen_range(0..=MAX_DATA);
-            let add_one = |definition: &mut RecordDefinitionBuilder,
+            let add_one = |definition: &mut RecordDefinitionBuilder<_>,
                            rng: &mut rand_chacha::ChaCha8Rng,
                            i: usize| match rng.gen_range(0..4) {
                 0 => {
@@ -485,7 +496,7 @@ mod tests {
             let def = definition.build();
             let max_size = def.max_size();
             for datum in def.datum_definitions() {
-                assert!(datum.offset + datum.size <= max_size);
+                assert!(datum.offset + datum.size() <= max_size);
                 assert_eq!(
                     datum.offset() % datum.type_align(),
                     0,
@@ -498,7 +509,7 @@ mod tests {
                 for w in v.data.as_slice().windows(2) {
                     let datum1 = def.get_datum_definition(w[0]).unwrap();
                     let datum2 = def.get_datum_definition(w[1]).unwrap();
-                    assert!(datum1.offset + datum1.size <= datum2.offset);
+                    assert!(datum1.offset + datum1.size() <= datum2.offset);
                 }
             }
         }
