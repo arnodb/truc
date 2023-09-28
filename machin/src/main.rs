@@ -5,6 +5,7 @@ extern crate static_assertions;
 
 #[allow(dead_code)]
 #[allow(clippy::borrowed_box)]
+#[allow(clippy::module_inception)]
 mod truc;
 
 fn machin() {
