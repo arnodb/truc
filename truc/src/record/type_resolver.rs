@@ -1,4 +1,4 @@
-use crate::record::type_name::truc_type_name;
+use crate::record::type_name::{truc_dynamic_type_name, truc_type_name};
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap};
 
@@ -11,6 +11,8 @@ pub struct TypeInfo {
 
 pub trait TypeResolver {
     fn type_info<T>(&self) -> TypeInfo;
+
+    fn dynamic_type_info(&self, type_name: &str) -> TypeInfo;
 }
 
 impl<R> TypeResolver for &R
@@ -19,6 +21,10 @@ where
 {
     fn type_info<T>(&self) -> TypeInfo {
         R::type_info::<T>(self)
+    }
+
+    fn dynamic_type_info(&self, type_name: &str) -> TypeInfo {
+        R::dynamic_type_info(self, type_name)
     }
 }
 
@@ -31,6 +37,10 @@ impl TypeResolver for HostTypeResolver {
             size: std::mem::size_of::<T>(),
             align: std::mem::align_of::<T>(),
         }
+    }
+
+    fn dynamic_type_info(&self, _type_name: &str) -> TypeInfo {
+        unimplemented!("HostTypeResolver cannot resolve dynamic types")
     }
 }
 
@@ -127,6 +137,14 @@ impl Default for StaticTypeResolver {
 impl TypeResolver for StaticTypeResolver {
     fn type_info<T>(&self) -> TypeInfo {
         let type_name = truc_type_name::<T>();
+        self.types
+            .get(&type_name)
+            .unwrap_or_else(|| panic!("Could not resolve type {}", type_name))
+            .clone()
+    }
+
+    fn dynamic_type_info(&self, type_name: &str) -> TypeInfo {
+        let type_name = truc_dynamic_type_name(type_name);
         self.types
             .get(&type_name)
             .unwrap_or_else(|| panic!("Could not resolve type {}", type_name))

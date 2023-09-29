@@ -5,6 +5,12 @@ pub fn truc_type_name<T: ?Sized>() -> String {
     quote!(#syn_type).to_string()
 }
 
+pub fn truc_dynamic_type_name(type_name: &str) -> String {
+    let mut syn_type = syn::parse_str::<syn::Type>(type_name).expect("syn type");
+    rewrite_type(&mut syn_type);
+    quote!(#syn_type).to_string()
+}
+
 fn rewrite_type(syn_type: &mut syn::Type) {
     match syn_type {
         syn::Type::Array(syn::TypeArray {

@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::PathBuf;
 use truc::generator::generate;
 use truc::record::definition::{DatumDefinitionOverride, RecordDefinitionBuilder};
-use truc::record::type_resolver::{HostTypeResolver, StaticTypeResolver, TypeInfo, TypeResolver};
+use truc::record::type_resolver::{StaticTypeResolver, TypeInfo};
 
 const SHARED_DIR: &str = "shared_machin";
 
@@ -60,30 +60,21 @@ fn get_build_info() -> BuildInfo {
     }
 }
 
-enum MixedTypeResolver {
-    Host(HostTypeResolver),
-    Static(StaticTypeResolver),
-}
-
-impl TypeResolver for MixedTypeResolver {
-    fn type_info<T>(&self) -> TypeInfo {
-        match self {
-            Self::Host(resolver) => resolver.type_info::<T>(),
-            Self::Static(resolver) => resolver.type_info::<T>(),
-        }
-    }
-}
-
-fn build_type_resolver(cross_compilation: &CrossCompilation) -> MixedTypeResolver {
+fn build_type_resolver(cross_compilation: &CrossCompilation) -> StaticTypeResolver {
     match cross_compilation {
-        CrossCompilation::No => MixedTypeResolver::Host(HostTypeResolver),
+        CrossCompilation::No => {
+            let mut resolver = StaticTypeResolver::new();
+            resolver.add_std_types();
+            resolver.add_type::<MachinEnum>();
+            resolver
+        }
         CrossCompilation::Yes { shared_path } => {
             let file_path = shared_path.join("target_types.json");
             let json = std::fs::read_to_string(&file_path)
                 .unwrap_or_else(|err| panic!("Could not read {:?}: {:?}", &file_path, err));
             let target_types: BTreeMap<String, TypeInfo> = serde_json::from_str(&json)
                 .unwrap_or_else(|err| panic!("Could not parse {:?}: {:?}", &file_path, err));
-            MixedTypeResolver::Static(StaticTypeResolver::from(target_types))
+            StaticTypeResolver::from(target_types)
         }
     }
 }

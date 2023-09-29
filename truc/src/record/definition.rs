@@ -298,6 +298,21 @@ where
         datum_id
     }
 
+    pub fn add_dynamic_datum<T, N>(&mut self, name: N, r#type: T) -> DatumId
+    where
+        T: AsRef<str>,
+        N: Into<String>,
+    {
+        let datum_id = self.datum_definitions.push(
+            name.into(),
+            std::usize::MAX,
+            self.type_resolver.dynamic_type_info(r#type.as_ref()),
+            false,
+        );
+        self.data_to_add.push(datum_id);
+        datum_id
+    }
+
     pub fn copy_datum(&mut self, datum: &DatumDefinition) -> DatumId {
         let datum_id = self.datum_definitions.push(
             datum.name().into(),
