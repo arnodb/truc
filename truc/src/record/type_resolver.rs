@@ -77,19 +77,25 @@ impl StaticTypeResolver {
     }
 
     pub fn add_std_types(&mut self) {
-        macro_rules! add_type_and_arrays {
+        macro_rules! add_type {
             ($type:ty) => {
                 self.add_type::<$type>();
-                self.add_type::<[$type; 1]>();
-                self.add_type::<[$type; 2]>();
-                self.add_type::<[$type; 3]>();
-                self.add_type::<[$type; 4]>();
-                self.add_type::<[$type; 5]>();
-                self.add_type::<[$type; 6]>();
-                self.add_type::<[$type; 7]>();
-                self.add_type::<[$type; 8]>();
-                self.add_type::<[$type; 9]>();
-                self.add_type::<[$type; 10]>();
+                self.add_type::<Option<$type>>();
+            };
+        }
+        macro_rules! add_type_and_arrays {
+            ($type:ty) => {
+                add_type!($type);
+                add_type!([$type; 1]);
+                add_type!([$type; 2]);
+                add_type!([$type; 3]);
+                add_type!([$type; 4]);
+                add_type!([$type; 5]);
+                add_type!([$type; 6]);
+                add_type!([$type; 7]);
+                add_type!([$type; 8]);
+                add_type!([$type; 9]);
+                add_type!([$type; 10]);
             };
         }
         add_type_and_arrays!(u8);
