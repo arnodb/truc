@@ -303,11 +303,12 @@ where
         T: AsRef<str>,
         N: Into<String>,
     {
+        let dynamic_type_info = self.type_resolver.dynamic_type_info(r#type.as_ref());
         let datum_id = self.datum_definitions.push(
             name.into(),
             std::usize::MAX,
-            self.type_resolver.dynamic_type_info(r#type.as_ref()),
-            false,
+            dynamic_type_info.info,
+            dynamic_type_info.allow_uninit,
         );
         self.data_to_add.push(datum_id);
         datum_id

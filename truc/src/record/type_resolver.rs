@@ -9,10 +9,16 @@ pub struct TypeInfo {
     pub align: usize,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DynamicTypeInfo {
+    pub info: TypeInfo,
+    pub allow_uninit: bool,
+}
+
 pub trait TypeResolver {
     fn type_info<T>(&self) -> TypeInfo;
 
-    fn dynamic_type_info(&self, type_name: &str) -> TypeInfo;
+    fn dynamic_type_info(&self, type_name: &str) -> DynamicTypeInfo;
 }
 
 impl<R> TypeResolver for &R
@@ -23,7 +29,7 @@ where
         R::type_info::<T>(self)
     }
 
-    fn dynamic_type_info(&self, type_name: &str) -> TypeInfo {
+    fn dynamic_type_info(&self, type_name: &str) -> DynamicTypeInfo {
         R::dynamic_type_info(self, type_name)
     }
 }
@@ -39,14 +45,14 @@ impl TypeResolver for HostTypeResolver {
         }
     }
 
-    fn dynamic_type_info(&self, _type_name: &str) -> TypeInfo {
+    fn dynamic_type_info(&self, _type_name: &str) -> DynamicTypeInfo {
         unimplemented!("HostTypeResolver cannot resolve dynamic types")
     }
 }
 
-#[derive(Debug, From)]
+#[derive(Debug, From, Serialize, Deserialize)]
 pub struct StaticTypeResolver {
-    types: BTreeMap<String, TypeInfo>,
+    types: BTreeMap<String, DynamicTypeInfo>,
 }
 
 impl StaticTypeResolver {
@@ -60,10 +66,39 @@ impl StaticTypeResolver {
         let type_name = truc_type_name::<T>();
         match self.types.entry(type_name.clone()) {
             Entry::Vacant(vacant) => {
-                vacant.insert(TypeInfo {
-                    name: type_name,
-                    size: std::mem::size_of::<T>(),
-                    align: std::mem::align_of::<T>(),
+                vacant.insert(DynamicTypeInfo {
+                    info: TypeInfo {
+                        name: type_name,
+                        size: std::mem::size_of::<T>(),
+                        align: std::mem::align_of::<T>(),
+                    },
+                    allow_uninit: false,
+                });
+            }
+            Entry::Occupied(occupied) => {
+                panic!(
+                    "Type {} is already defined with {:?}",
+                    type_name,
+                    occupied.get()
+                );
+            }
+        }
+    }
+
+    pub fn add_type_allow_uninit<T>(&mut self)
+    where
+        T: Copy,
+    {
+        let type_name = truc_type_name::<T>();
+        match self.types.entry(type_name.clone()) {
+            Entry::Vacant(vacant) => {
+                vacant.insert(DynamicTypeInfo {
+                    info: TypeInfo {
+                        name: type_name,
+                        size: std::mem::size_of::<T>(),
+                        align: std::mem::align_of::<T>(),
+                    },
+                    allow_uninit: true,
                 });
             }
             Entry::Occupied(occupied) => {
@@ -82,6 +117,10 @@ impl StaticTypeResolver {
                 self.add_type::<$type>();
                 self.add_type::<Option<$type>>();
             };
+            ($type:ty, allow_uninit) => {
+                self.add_type_allow_uninit::<$type>();
+                self.add_type_allow_uninit::<Option<$type>>();
+            };
         }
         macro_rules! add_type_and_arrays {
             ($type:ty) => {
@@ -97,27 +136,40 @@ impl StaticTypeResolver {
                 add_type!([$type; 9]);
                 add_type!([$type; 10]);
             };
+            ($type:ty, allow_uninit) => {
+                add_type!($type, allow_uninit);
+                add_type!([$type; 1], allow_uninit);
+                add_type!([$type; 2], allow_uninit);
+                add_type!([$type; 3], allow_uninit);
+                add_type!([$type; 4], allow_uninit);
+                add_type!([$type; 5], allow_uninit);
+                add_type!([$type; 6], allow_uninit);
+                add_type!([$type; 7], allow_uninit);
+                add_type!([$type; 8], allow_uninit);
+                add_type!([$type; 9], allow_uninit);
+                add_type!([$type; 10], allow_uninit);
+            };
         }
-        add_type_and_arrays!(u8);
-        add_type_and_arrays!(u16);
-        add_type_and_arrays!(u32);
-        add_type_and_arrays!(u64);
-        add_type_and_arrays!(u128);
-        add_type_and_arrays!(usize);
+        add_type_and_arrays!(u8, allow_uninit);
+        add_type_and_arrays!(u16, allow_uninit);
+        add_type_and_arrays!(u32, allow_uninit);
+        add_type_and_arrays!(u64, allow_uninit);
+        add_type_and_arrays!(u128, allow_uninit);
+        add_type_and_arrays!(usize, allow_uninit);
 
-        add_type_and_arrays!(i8);
-        add_type_and_arrays!(i16);
-        add_type_and_arrays!(i32);
-        add_type_and_arrays!(i64);
-        add_type_and_arrays!(i128);
-        add_type_and_arrays!(isize);
+        add_type_and_arrays!(i8, allow_uninit);
+        add_type_and_arrays!(i16, allow_uninit);
+        add_type_and_arrays!(i32, allow_uninit);
+        add_type_and_arrays!(i64, allow_uninit);
+        add_type_and_arrays!(i128, allow_uninit);
+        add_type_and_arrays!(isize, allow_uninit);
 
-        add_type_and_arrays!(f32);
-        add_type_and_arrays!(f64);
+        add_type_and_arrays!(f32, allow_uninit);
+        add_type_and_arrays!(f64, allow_uninit);
 
-        add_type_and_arrays!(char);
+        add_type_and_arrays!(char, allow_uninit);
 
-        add_type_and_arrays!(bool);
+        add_type_and_arrays!(bool, allow_uninit);
 
         add_type_and_arrays!(String);
         add_type_and_arrays!(Box<str>);
@@ -146,10 +198,11 @@ impl TypeResolver for StaticTypeResolver {
         self.types
             .get(&type_name)
             .unwrap_or_else(|| panic!("Could not resolve type {}", type_name))
+            .info
             .clone()
     }
 
-    fn dynamic_type_info(&self, type_name: &str) -> TypeInfo {
+    fn dynamic_type_info(&self, type_name: &str) -> DynamicTypeInfo {
         let type_name = truc_dynamic_type_name(type_name);
         self.types
             .get(&type_name)
