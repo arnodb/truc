@@ -1,5 +1,6 @@
 use crate::record::type_resolver::{TypeInfo, TypeResolver};
 use std::fmt::{Display, Formatter};
+use std::ops::Index;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
@@ -204,6 +205,15 @@ impl Display for RecordDefinition {
             writeln!(f)?;
         }
         Ok(())
+    }
+}
+
+impl Index<DatumId> for RecordDefinition {
+    type Output = DatumDefinition;
+
+    fn index(&self, index: DatumId) -> &Self::Output {
+        self.get_datum_definition(index)
+            .unwrap_or_else(|| panic!("datum #{} not found", index))
     }
 }
 
@@ -464,6 +474,18 @@ where
     }
 }
 
+impl<R> Index<DatumId> for RecordDefinitionBuilder<R>
+where
+    R: TypeResolver,
+{
+    type Output = DatumDefinition;
+
+    fn index(&self, index: DatumId) -> &Self::Output {
+        self.get_datum_definition(index)
+            .unwrap_or_else(|| panic!("datum #{} not found", index))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
@@ -523,8 +545,8 @@ mod tests {
             }
             for v in def.variants() {
                 for w in v.data.as_slice().windows(2) {
-                    let datum1 = def.get_datum_definition(w[0]).unwrap();
-                    let datum2 = def.get_datum_definition(w[1]).unwrap();
+                    let datum1 = &def[w[0]];
+                    let datum2 = &def[w[1]];
                     assert!(datum1.offset + datum1.size() <= datum2.offset);
                 }
             }

@@ -144,7 +144,7 @@ fn index_first_char() {
     def_1.close_record_variant();
 
     let mut def_2 = RecordDefinitionBuilder::new(&type_resolver);
-    def_2.copy_datum(def_1.get_datum_definition(word).expect("datum"));
+    def_2.copy_datum(&def_1[word]);
     let group = def_2.close_record_variant();
 
     def_1.remove_datum(word);

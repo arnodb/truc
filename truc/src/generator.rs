@@ -49,11 +49,7 @@ This is to be used in custom allocators."#,
         let data = variant
             .data()
             .sorted()
-            .map(|d| {
-                definition
-                    .get_datum_definition(d)
-                    .unwrap_or_else(|| panic!("datum #{}", d))
-            })
+            .map(|d| &definition[d])
             .collect::<Vec<_>>();
 
         let capped_record_name = format!("CappedRecord{}", variant.id());
@@ -69,11 +65,7 @@ This is to be used in custom allocators."#,
                     .sorted()
                     .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
                     .filter_map(|either| match either {
-                        EitherOrBoth::Left(left_id) => Some(Either::Left(
-                            definition
-                                .get_datum_definition(left_id)
-                                .unwrap_or_else(|| panic!("datum #{}", left_id)),
-                        )),
+                        EitherOrBoth::Left(left_id) => Some(Either::Left(&definition[left_id])),
                         EitherOrBoth::Right(right) => Some(Either::Right(right)),
                         EitherOrBoth::Both(_, _) => None,
                     })
