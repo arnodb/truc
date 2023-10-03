@@ -217,6 +217,15 @@ impl Index<DatumId> for RecordDefinition {
     }
 }
 
+impl Index<RecordVariantId> for RecordDefinition {
+    type Output = RecordVariant;
+
+    fn index(&self, index: RecordVariantId) -> &Self::Output {
+        self.get_variant(index)
+            .unwrap_or_else(|| panic!("variant #{} not found", index))
+    }
+}
+
 pub struct DatumDefinitionOverride {
     pub type_name: Option<String>,
     pub size: Option<usize>,
@@ -483,6 +492,18 @@ where
     fn index(&self, index: DatumId) -> &Self::Output {
         self.get_datum_definition(index)
             .unwrap_or_else(|| panic!("datum #{} not found", index))
+    }
+}
+
+impl<R> Index<RecordVariantId> for RecordDefinitionBuilder<R>
+where
+    R: TypeResolver,
+{
+    type Output = RecordVariant;
+
+    fn index(&self, index: RecordVariantId) -> &Self::Output {
+        self.get_variant(index)
+            .unwrap_or_else(|| panic!("variant #{} not found", index))
     }
 }
 
