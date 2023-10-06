@@ -368,11 +368,13 @@ where
         }
     }
 
+    fn has_pending_changes(&self) -> bool {
+        // Need to create at least one variant
+        self.variants.is_empty() || !self.data_to_remove.is_empty() || !self.data_to_add.is_empty()
+    }
+
     pub fn close_record_variant(&mut self) -> RecordVariantId {
-        if !self.variants.is_empty()
-            && self.data_to_remove.is_empty()
-            && self.data_to_add.is_empty()
-        {
+        if !self.has_pending_changes() {
             return (self.variants.len() - 1).into();
         }
 
@@ -468,6 +470,16 @@ where
             }
             None
         })
+    }
+
+    pub fn get_latest_variant_datum_definition_by_name(
+        &self,
+        name: &str,
+    ) -> Option<&DatumDefinition> {
+        if self.variants.is_empty() {
+            return None;
+        }
+        self.get_variant_datum_definition_by_name((self.variants.len() - 1).into(), name)
     }
 
     pub fn build(mut self) -> RecordDefinition {
