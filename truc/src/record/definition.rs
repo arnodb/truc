@@ -187,7 +187,7 @@ impl RecordDefinition {
         self.datum_definitions()
             .map(|d| d.type_align())
             .reduce(usize::max)
-            .unwrap_or(0)
+            .unwrap_or(std::mem::align_of::<()>())
     }
 
     pub fn max_size(&self) -> usize {
