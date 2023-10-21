@@ -114,6 +114,10 @@ impl RecordVariant {
         self.data.iter().copied()
     }
 
+    pub fn data_len(&self) -> usize {
+        self.data.len()
+    }
+
     fn fmt_representation(
         &self,
         datum_definitions: &DatumDefinitionCollection,
