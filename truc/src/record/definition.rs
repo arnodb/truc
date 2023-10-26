@@ -1,9 +1,15 @@
 use crate::record::type_resolver::{TypeInfo, TypeResolver};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::Index;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
+
+impl Debug for DatumId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{}", self.0))
+    }
+}
 
 #[derive(Debug, new)]
 pub struct DatumDefinition {
