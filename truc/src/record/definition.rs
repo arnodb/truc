@@ -476,14 +476,25 @@ where
         })
     }
 
-    pub fn get_latest_variant_datum_definition_by_name(
-        &self,
-        name: &str,
-    ) -> Option<&DatumDefinition> {
-        if self.variants.is_empty() {
-            return None;
-        }
-        self.get_variant_datum_definition_by_name((self.variants.len() - 1).into(), name)
+    pub fn get_current_data(&self) -> impl Iterator<Item = DatumId> + '_ {
+        self.variants
+            .last()
+            .map(|variant| {
+                variant
+                    .data
+                    .iter()
+                    .cloned()
+                    .filter(|d| !self.data_to_remove.contains(d))
+            })
+            .into_iter()
+            .flatten()
+            .chain(self.data_to_add.iter().cloned())
+    }
+
+    pub fn get_current_datum_definition_by_name(&self, name: &str) -> Option<&DatumDefinition> {
+        self.get_current_data()
+            .filter_map(|d| self.datum_definitions.get(d))
+            .find(|datum| datum.name() == name)
     }
 
     pub fn build(mut self) -> RecordDefinition {
