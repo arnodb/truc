@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn should_align_offsets_according_to_rust_alignment_rules() {
         let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
-        println!("Seed: {:02x?}", rng.get_seed());
+        println!("Seed: {:#04x?}", rng.get_seed());
 
         let type_resolver = HostTypeResolver;
 
