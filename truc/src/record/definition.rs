@@ -1,6 +1,9 @@
+use std::{
+    fmt::{Debug, Display, Formatter},
+    ops::Index,
+};
+
 use crate::record::type_resolver::{TypeInfo, TypeResolver};
-use std::fmt::{Debug, Display, Formatter};
-use std::ops::Index;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
@@ -542,9 +545,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
+
+    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
 
     #[test]
     fn should_align_offsets_according_to_rust_alignment_rules() {

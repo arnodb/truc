@@ -1,12 +1,13 @@
+use std::{collections::BTreeMap, env, fs::File, io::Write, path::PathBuf};
+
 use machin_data::MachinEnum;
-use std::collections::BTreeMap;
-use std::env;
-use std::fs::File;
-use std::io::Write;
-use std::path::PathBuf;
-use truc::generator::generate;
-use truc::record::definition::{DatumDefinitionOverride, RecordDefinitionBuilder};
-use truc::record::type_resolver::{DynamicTypeInfo, StaticTypeResolver};
+use truc::{
+    generator::{config::GeneratorConfig, generate},
+    record::{
+        definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
+        type_resolver::{DynamicTypeInfo, StaticTypeResolver},
+    },
+};
 
 const SHARED_DIR: &str = "shared_machin";
 
@@ -120,7 +121,12 @@ fn machin() {
     let definition = definition.build();
 
     let mut file = File::create(out_dir_path.join("machin_truc.rs")).unwrap();
-    write!(file, "{}", generate(&definition)).unwrap();
+    write!(
+        file,
+        "{}",
+        generate(&definition, &GeneratorConfig::default())
+    )
+    .unwrap();
 }
 
 fn index_first_char() {
@@ -160,11 +166,11 @@ fn index_first_char() {
 
     let def_1 = def_1.build();
     let mut file = File::create(out_dir_path.join("index_first_char_1.rs")).unwrap();
-    write!(file, "{}", generate(&def_1)).unwrap();
+    write!(file, "{}", generate(&def_1, &GeneratorConfig::default())).unwrap();
 
     let def_2 = def_2.build();
     let mut file = File::create(out_dir_path.join("index_first_char_2.rs")).unwrap();
-    write!(file, "{}", generate(&def_2)).unwrap();
+    write!(file, "{}", generate(&def_2, &GeneratorConfig::default())).unwrap();
 }
 
 fn main() {

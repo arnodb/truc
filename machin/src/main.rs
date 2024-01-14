@@ -9,8 +9,9 @@ extern crate static_assertions;
 mod truc;
 
 fn machin() {
-    use crate::truc::*;
     use machin_data::MachinEnum;
+
+    use crate::truc::*;
 
     assert_eq!(MAX_SIZE, 72);
 

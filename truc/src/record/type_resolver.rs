@@ -1,6 +1,8 @@
-use crate::record::type_name::{truc_dynamic_type_name, truc_type_name};
-use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap};
+
+use serde::{Deserialize, Serialize};
+
+use crate::record::type_name::{truc_dynamic_type_name, truc_type_name};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TypeInfo {
