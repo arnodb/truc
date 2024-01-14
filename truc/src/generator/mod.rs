@@ -7,7 +7,8 @@ use self::{
     config::GeneratorConfig,
     fragment::{
         from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
-        from_previous_record_impls::FromPreviousRecordImplsGenerator, FragmentGenerator,
+        from_previous_record_impls::FromPreviousRecordImplsGenerator,
+        from_unpacked_record_impls::FromUnpackedRecordImplsGenerator, FragmentGenerator,
         FragmentGeneratorSpecs, RecordGeneric, RecordSpec,
     },
 };
@@ -207,29 +208,14 @@ pub type {} = {}<{{ MAX_SIZE }}>;"#,
             &record_spec.data,
             &mut scope,
         );
-        generate_from_constructor_record_impl(
-            RecordImplRecordNames {
-                name: &record_spec.capped_record_name,
-                unpacked: &record_spec.unpacked_record_name,
-            },
-            false,
-            &mut scope,
-        );
-        generate_from_constructor_record_impl(
-            RecordImplRecordNames {
-                name: &record_spec.capped_record_name,
-                unpacked: &record_spec.unpacked_uninit_record_name,
-            },
-            true,
-            &mut scope,
-        );
 
         let specs = FragmentGeneratorSpecs {
             record: &record_spec,
             prev_record: prev_record_spec,
         };
 
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 2] = [
+        let common_fragment_generators: [Box<dyn FragmentGenerator>; 3] = [
+            Box::new(FromUnpackedRecordImplsGenerator),
             Box::new(FromPreviousRecordDataRecordsGenerator),
             Box::new(FromPreviousRecordImplsGenerator),
         ];
@@ -422,27 +408,6 @@ fn generate_drop_impl(record_name: &str, data: &[&DatumDefinition], scope: &mut 
             datum.offset(),
         ));
     }
-}
-
-fn generate_from_constructor_record_impl(
-    record_names: RecordImplRecordNames,
-    uninit: bool,
-    scope: &mut Scope,
-) {
-    let from_impl = scope
-        .new_impl(record_names.name)
-        .generic(CAP_GENERIC)
-        .target_generic(CAP)
-        .impl_trait(format!("From<{}>", record_names.unpacked));
-
-    let from_fn = from_impl
-        .new_fn("from")
-        .arg("from", record_names.unpacked)
-        .ret("Self");
-    from_fn.line(format!(
-        "Self::{}(from)",
-        if !uninit { "new" } else { "new_uninit" },
-    ));
 }
 
 #[derive(Debug, PartialEq, Eq)]

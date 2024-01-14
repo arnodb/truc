@@ -4,6 +4,7 @@ use crate::record::definition::{DatumDefinition, RecordVariant};
 
 pub(crate) mod from_previous_record_data_records;
 pub(crate) mod from_previous_record_impls;
+pub(crate) mod from_unpacked_record_impls;
 
 pub trait FragmentGenerator {
     fn imports(&self, _scope: &mut Scope) {}
