@@ -1,6 +1,6 @@
-use std::{collections::BTreeSet, ops::Deref};
+use std::collections::BTreeSet;
 
-use codegen::{Impl, Scope, Type};
+use codegen::{Scope, Type};
 use itertools::{Either, EitherOrBoth, Itertools};
 
 use self::{
@@ -9,8 +9,9 @@ use self::{
         drop_impl::DropImplGenerator,
         from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
         from_previous_record_impls::FromPreviousRecordImplsGenerator,
-        from_unpacked_record_impls::FromUnpackedRecordImplsGenerator, FragmentGenerator,
-        FragmentGeneratorSpecs, RecordGeneric, RecordSpec,
+        from_unpacked_record_impls::FromUnpackedRecordImplsGenerator,
+        record_impl::RecordImplGenerator, FragmentGenerator, FragmentGeneratorSpecs, RecordGeneric,
+        RecordSpec,
     },
 };
 use crate::record::definition::{DatumDefinition, RecordDefinition};
@@ -157,10 +158,6 @@ using it."#,
             },
             &mut scope,
         );
-        let unpacked_uninit_info = UninitInfo {
-            record_name: &record_spec.unpacked_uninit_record_name,
-            safe_record_name: &record_spec.unpacked_uninit_safe_record_name,
-        };
 
         let record = scope
             .new_struct(&record_spec.capped_record_name)
@@ -195,22 +192,13 @@ pub type {} = {}<{{ MAX_SIZE }}>;"#,
             record_spec.capped_record_name,
         ));
 
-        generate_record_impl(
-            &record_spec,
-            RecordImplRecordNames {
-                name: &record_spec.capped_record_name,
-                unpacked: &record_spec.unpacked_record_name,
-            },
-            &unpacked_uninit_info,
-            &mut scope,
-        );
-
         let specs = FragmentGeneratorSpecs {
             record: &record_spec,
             prev_record: prev_record_spec,
         };
 
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 4] = [
+        let common_fragment_generators: [Box<dyn FragmentGenerator>; 5] = [
+            Box::new(RecordImplGenerator),
             Box::new(DropImplGenerator),
             Box::new(FromUnpackedRecordImplsGenerator),
             Box::new(FromPreviousRecordDataRecordsGenerator),
@@ -242,151 +230,6 @@ pub type {} = {}<{{ MAX_SIZE }}>;"#,
 struct RecordImplRecordNames<'a> {
     name: &'a str,
     unpacked: &'a str,
-}
-
-fn generate_record_impl(
-    record_spec: &RecordSpec,
-    record_names: RecordImplRecordNames,
-    uninit_info: &UninitInfo,
-    scope: &mut Scope,
-) {
-    let record_impl = scope
-        .new_impl(record_names.name)
-        .generic(CAP_GENERIC)
-        .target_generic(CAP);
-
-    generate_constructor(record_spec, record_names.unpacked, None, record_impl);
-    generate_constructor(
-        record_spec,
-        uninit_info.record_name,
-        Some(uninit_info),
-        record_impl,
-    );
-
-    generate_unpacker(&record_spec.data, record_names.unpacked, record_impl);
-
-    for datum in &record_spec.data {
-        record_impl
-            .new_fn(datum.name())
-            .vis("pub")
-            .arg_ref_self()
-            .ret(format!("&{}", datum.type_name()))
-            .line(format!(
-                "unsafe {{ self.data.get::<{}>({}) }}",
-                datum.type_name(),
-                datum.offset()
-            ));
-
-        record_impl
-            .new_fn(&format!("{}_mut", datum.name()))
-            .vis("pub")
-            .arg_mut_self()
-            .ret(format!("&mut {}", datum.type_name()))
-            .line(format!(
-                "unsafe {{ self.data.get_mut::<{}>({}) }}",
-                datum.type_name(),
-                datum.offset()
-            ));
-    }
-}
-
-struct UninitInfo<'a> {
-    record_name: &'a str,
-    safe_record_name: &'a str,
-}
-
-fn generate_constructor(
-    record_spec: &RecordSpec,
-    unpacked_record_name: &str,
-    uninit: Option<&UninitInfo>,
-    record_impl: &mut Impl,
-) {
-    let (has_data, uninit_has_data) = {
-        (
-            !record_spec.data.is_empty(),
-            if uninit.is_some() {
-                record_spec.data.iter().any(|datum| !datum.allow_uninit())
-            } else {
-                false
-            },
-        )
-    };
-    let new_fn = record_impl
-        .new_fn(if uninit.is_none() {
-            "new"
-        } else {
-            "new_uninit"
-        })
-        .vis("pub")
-        .arg(
-            if uninit.is_some() || has_data {
-                "from"
-            } else {
-                "_from"
-            },
-            unpacked_record_name,
-        )
-        .ret("Self");
-    if let Some(uninit) = uninit {
-        new_fn.line(format!(
-            "let {} = {}{}::from(from);",
-            if uninit_has_data { "from" } else { "_from" },
-            uninit.safe_record_name,
-            record_spec
-                .unpacked_uninit_safe_generic
-                .as_ref()
-                .map_or_else(String::new, |generic| format!("::<{}>", generic.typed))
-        ));
-    }
-    new_fn.line(format!(
-        "let {}data = RecordMaybeUninit::new();",
-        if uninit.is_none() && has_data || uninit.is_some() && uninit_has_data {
-            "mut "
-        } else {
-            ""
-        }
-    ));
-    for datum in record_spec
-        .data
-        .iter()
-        .filter(|datum| uninit.is_none() || !datum.allow_uninit())
-    {
-        new_fn.line(format!(
-            "unsafe {{ data.write({}, from.{}); }}",
-            datum.offset(),
-            datum.name()
-        ));
-    }
-    new_fn.line("Self { data }");
-}
-
-fn generate_unpacker(
-    data: &[&DatumDefinition],
-    unpacked_record_name: &str,
-    record_impl: &mut Impl,
-) {
-    let unpack_fn = record_impl
-        .new_fn("unpack")
-        .arg_self()
-        .vis("pub")
-        .ret(unpacked_record_name);
-    for datum in data {
-        unpack_fn.line(format!(
-            "let {}: {} = unsafe {{ self.data.read({}) }};",
-            datum.name(),
-            datum.type_name(),
-            datum.offset(),
-        ));
-    }
-    unpack_fn.line("std::mem::forget(self);");
-    unpack_fn.line(format!(
-        "{} {{ {} }}",
-        unpacked_record_name,
-        data.iter()
-            .map(Deref::deref)
-            .map(DatumDefinition::name)
-            .join(", ")
-    ));
 }
 
 #[derive(Debug, PartialEq, Eq)]
