@@ -6,6 +6,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use self::{
     config::GeneratorConfig,
     fragment::{
+        drop_impl::DropImplGenerator,
         from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
         from_previous_record_impls::FromPreviousRecordImplsGenerator,
         from_unpacked_record_impls::FromUnpackedRecordImplsGenerator, FragmentGenerator,
@@ -203,18 +204,14 @@ pub type {} = {}<{{ MAX_SIZE }}>;"#,
             &unpacked_uninit_info,
             &mut scope,
         );
-        generate_drop_impl(
-            &record_spec.capped_record_name,
-            &record_spec.data,
-            &mut scope,
-        );
 
         let specs = FragmentGeneratorSpecs {
             record: &record_spec,
             prev_record: prev_record_spec,
         };
 
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 3] = [
+        let common_fragment_generators: [Box<dyn FragmentGenerator>; 4] = [
+            Box::new(DropImplGenerator),
             Box::new(FromUnpackedRecordImplsGenerator),
             Box::new(FromPreviousRecordDataRecordsGenerator),
             Box::new(FromPreviousRecordImplsGenerator),
@@ -390,24 +387,6 @@ fn generate_unpacker(
             .map(DatumDefinition::name)
             .join(", ")
     ));
-}
-
-fn generate_drop_impl(record_name: &str, data: &[&DatumDefinition], scope: &mut Scope) {
-    let drop_impl = scope
-        .new_impl(record_name)
-        .generic(CAP_GENERIC)
-        .target_generic(CAP)
-        .impl_trait("Drop");
-
-    let drop_fn = drop_impl.new_fn("drop").arg_mut_self();
-    for datum in data {
-        drop_fn.line(format!(
-            "let _{}: {} = unsafe {{ self.data.read({}) }};",
-            datum.name(),
-            datum.type_name(),
-            datum.offset(),
-        ));
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
