@@ -9,7 +9,7 @@ use self::{
         drop_impl::DropImplGenerator,
         from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
         from_previous_record_impls::FromPreviousRecordImplsGenerator,
-        from_unpacked_record_impls::FromUnpackedRecordImplsGenerator,
+        from_unpacked_record_impls::FromUnpackedRecordImplsGenerator, record::RecordGenerator,
         record_impl::RecordImplGenerator, FragmentGenerator, FragmentGeneratorSpecs, RecordGeneric,
         RecordSpec,
     },
@@ -89,6 +89,7 @@ This is to be used in custom allocators."#,
         let unpacked_uninit_safe_generic = safe_record_generic(&data);
         let plus_uninit_safe_generic = safe_record_generic(&plus_data);
         let record_spec = RecordSpec {
+            max_type_align,
             variant,
             capped_record_name: format!("CappedRecord{}", variant.id()),
             record_name: format!("Record{}", variant.id()),
@@ -159,45 +160,13 @@ using it."#,
             &mut scope,
         );
 
-        let record = scope
-            .new_struct(&record_spec.capped_record_name)
-            .repr(&format!("align({})", max_type_align))
-            .vis("pub")
-            .generic(CAP_GENERIC);
-        record.field("data", &uninit_type);
-        if let Some(prev_record_spec) = prev_record_spec.as_ref() {
-            record.doc(&format!(
-                r#"Record variant #{}.
-
-It may be converted from a [`Record{}`] via one of the various call to [`From::from`]
-
-It may also be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)"#,
-                variant.id(),
-                prev_record_spec.variant.id()
-            ));
-        } else {
-            record.doc(&format!(
-                r#"Record variant #{}.
-
-It may be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)"#,
-                variant.id()
-            ));
-        }
-
-        scope.raw(&format!(
-            r#"/// Record variant #{} with optimized capacity.
-pub type {} = {}<{{ MAX_SIZE }}>;"#,
-            variant.id(),
-            record_spec.record_name,
-            record_spec.capped_record_name,
-        ));
-
         let specs = FragmentGeneratorSpecs {
             record: &record_spec,
-            prev_record: prev_record_spec,
+            prev_record: prev_record_spec.as_ref(),
         };
 
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 5] = [
+        let common_fragment_generators: [Box<dyn FragmentGenerator>; 6] = [
+            Box::new(RecordGenerator),
             Box::new(RecordImplGenerator),
             Box::new(DropImplGenerator),
             Box::new(FromUnpackedRecordImplsGenerator),

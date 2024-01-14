@@ -6,6 +6,7 @@ pub(crate) mod drop_impl;
 pub(crate) mod from_previous_record_data_records;
 pub(crate) mod from_previous_record_impls;
 pub(crate) mod from_unpacked_record_impls;
+pub(crate) mod record;
 pub(crate) mod record_impl;
 
 pub trait FragmentGenerator {
@@ -17,11 +18,12 @@ pub trait FragmentGenerator {
 #[derive(Debug)]
 pub struct FragmentGeneratorSpecs<'a> {
     pub record: &'a RecordSpec<'a>,
-    pub prev_record: Option<RecordSpec<'a>>,
+    pub prev_record: Option<&'a RecordSpec<'a>>,
 }
 
 #[derive(Debug)]
 pub struct RecordSpec<'a> {
+    pub max_type_align: usize,
     pub variant: &'a RecordVariant,
     pub capped_record_name: String,
     pub record_name: String,
