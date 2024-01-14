@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, env, fs::File, io::Write, path::PathBuf};
 
 use machin_data::MachinEnum;
 use truc::{
-    generator::{config::GeneratorConfig, generate},
+    generator::{config::GeneratorConfig, fragment::serde::SerdeImplGenerator, generate},
     record::{
         definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
         type_resolver::{DynamicTypeInfo, StaticTypeResolver},
@@ -173,7 +173,59 @@ fn index_first_char() {
     write!(file, "{}", generate(&def_2, &GeneratorConfig::default())).unwrap();
 }
 
+fn serialize_deserialize() {
+    let BuildInfo {
+        out_dir_path,
+        cross_compilation,
+    } = get_build_info();
+
+    let type_resolver = build_type_resolver(&cross_compilation);
+
+    let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+
+    let a0 = definition.add_datum_allow_uninit::<u32, _>("datum_a");
+    let b0 = definition.add_datum_allow_uninit::<u32, _>("datum_b");
+    definition.close_record_variant();
+
+    let c1 = definition.add_datum_allow_uninit::<u32, _>("datum_c");
+    definition.close_record_variant();
+
+    definition.remove_datum(a0);
+    definition.close_record_variant();
+
+    let v = definition.add_datum_override::<Vec<()>, _>(
+        "datum_v",
+        DatumDefinitionOverride {
+            type_name: Some("Vec<u32>".to_string()),
+            size: None,
+            align: None,
+            allow_uninit: None,
+        },
+    );
+    definition.close_record_variant();
+
+    definition.remove_datum(b0);
+    definition.remove_datum(c1);
+    definition.remove_datum(v);
+
+    let definition = definition.build();
+
+    let mut file = File::create(out_dir_path.join("serialize_deserialize.rs")).unwrap();
+    write!(
+        file,
+        "{}",
+        generate(
+            &definition,
+            &GeneratorConfig {
+                custom_fragment_generators: vec![Box::new(SerdeImplGenerator)]
+            }
+        )
+    )
+    .unwrap();
+}
+
 fn main() {
     machin();
     index_first_char();
+    serialize_deserialize();
 }

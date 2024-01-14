@@ -9,6 +9,7 @@ pub(crate) mod from_previous_record_impls;
 pub(crate) mod from_unpacked_record_impls;
 pub(crate) mod record;
 pub(crate) mod record_impl;
+pub mod serde;
 
 pub trait FragmentGenerator {
     fn imports(&self, _scope: &mut Scope) {}

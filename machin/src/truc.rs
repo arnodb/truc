@@ -9,3 +9,7 @@ pub mod index_first_char {
         include!(concat!(env!("OUT_DIR"), "/index_first_char_2.rs"));
     }
 }
+
+pub mod serialize_deserialize {
+    include!(concat!(env!("OUT_DIR"), "/serialize_deserialize.rs"));
+}
