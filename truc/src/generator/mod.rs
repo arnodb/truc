@@ -6,7 +6,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use self::{
     config::GeneratorConfig,
     fragment::{
-        drop_impl::DropImplGenerator,
+        data_records::DataRecordsGenerator, drop_impl::DropImplGenerator,
         from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
         from_previous_record_impls::FromPreviousRecordImplsGenerator,
         from_unpacked_record_impls::FromUnpackedRecordImplsGenerator, record::RecordGenerator,
@@ -114,58 +114,13 @@ This is to be used in custom allocators."#,
             type_size_assertions.insert((datum.type_name(), datum.size()));
         }
 
-        generate_data_record(
-            RecordInfo {
-                name: &record_spec.unpacked_record_name,
-                public: true,
-                doc: Some(
-                    r#"Data container for packing/unpacking records.
-
-All the fields are named for the safe interoperability between the generated code and the code
-using it."#,
-                ),
-            },
-            &record_spec.data,
-            UninitKind::False,
-            &mut scope,
-        );
-        generate_data_record(
-            RecordInfo {
-                name: &record_spec.unpacked_uninit_record_name,
-                public: true,
-                doc: Some(
-                    r#"Data container for packing/unpacking records without the data to be left uninitialized.
-
-All the fields are named for the safe interoperability between the generated code and the code
-using it."#,
-                ),
-            },
-            &record_spec.data,
-            UninitKind::Unsafe,
-            &mut scope,
-        );
-        generate_data_record(
-            RecordInfo {
-                name: &record_spec.unpacked_uninit_safe_record_name,
-                public: false,
-                doc: Some(
-                    r#"It only exists to check that the uninitialized data is actually [`Copy`] at run time."#,
-                ),
-            },
-            &record_spec.data,
-            UninitKind::Safe {
-                unsafe_record_name: &record_spec.unpacked_uninit_record_name,
-                safe_generic: record_spec.unpacked_uninit_safe_generic.as_ref(),
-            },
-            &mut scope,
-        );
-
         let specs = FragmentGeneratorSpecs {
             record: &record_spec,
             prev_record: prev_record_spec.as_ref(),
         };
 
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 6] = [
+        let common_fragment_generators: [Box<dyn FragmentGenerator>; 7] = [
+            Box::new(DataRecordsGenerator),
             Box::new(RecordGenerator),
             Box::new(RecordImplGenerator),
             Box::new(DropImplGenerator),
@@ -211,12 +166,6 @@ enum UninitKind<'a> {
     },
 }
 
-struct RecordInfo<'a> {
-    name: &'a str,
-    public: bool,
-    doc: Option<&'a str>,
-}
-
 fn safe_record_generic(data: &[&DatumDefinition]) -> Option<RecordGeneric> {
     let mut generic = String::new();
     let mut short_generic = String::new();
@@ -243,6 +192,12 @@ fn safe_record_generic(data: &[&DatumDefinition]) -> Option<RecordGeneric> {
     } else {
         None
     }
+}
+
+struct RecordInfo<'a> {
+    name: &'a str,
+    public: bool,
+    doc: Option<&'a str>,
 }
 
 fn generate_data_record(
