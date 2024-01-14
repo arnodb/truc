@@ -6,6 +6,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use self::{
     config::GeneratorConfig,
     fragment::{
+        from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
         from_previous_record_impls::FromPreviousRecordImplsGenerator, FragmentGenerator,
         FragmentGeneratorSpecs, RecordGeneric, RecordSpec,
     },
@@ -222,74 +223,16 @@ pub type {} = {}<{{ MAX_SIZE }}>;"#,
             true,
             &mut scope,
         );
-        if let Some(prev_record_spec) = prev_record_spec.as_ref() {
-            generate_data_record(
-                RecordInfo {
-                    name: &record_spec.unpacked_record_in_name,
-                    public: true,
-                    doc: Some(&format!(
-                        r#"Data container for conversion from [`Record{}`]."#,
-                        prev_record_spec.variant.id()
-                    )),
-                },
-                &record_spec.plus_data,
-                UninitKind::False,
-                &mut scope,
-            );
-            generate_data_record(
-                RecordInfo {
-                    name: &record_spec.unpacked_uninit_record_in_name,
-                    public: true,
-                    doc: Some(&format!(
-                        r#"Data container for conversion from [`Record{}`] without the data to be left uninitialized."#,
-                        prev_record_spec.variant.id()
-                    )),
-                },
-                &record_spec.plus_data,
-                UninitKind::Unsafe,
-                &mut scope,
-            );
-            generate_data_record(
-                RecordInfo {
-                    name: &record_spec.unpacked_uninit_safe_record_in_name,
-                    public: false,
-                    doc: Some(
-                        r#"It only exists to check that the uninitialized data is actually [`Copy`] at run time."#,
-                    ),
-                },
-                &record_spec.plus_data,
-                UninitKind::Safe {
-                    unsafe_record_name: &record_spec.unpacked_uninit_record_in_name,
-                    safe_generic: record_spec.plus_uninit_safe_generic.as_ref(),
-                },
-                &mut scope,
-            );
-
-            generate_data_out_record(
-                RecordInfo {
-                    name: &record_spec.record_and_unpacked_out_name,
-                    public: true,
-                    doc: Some(&format!(
-                        r#"Result of conversion from record variant #{} to variant #{} via a [`From::from`] call.
-
-It contains all the removed data so that one can still use them, or drop them."#,
-                        prev_record_spec.variant.id(),
-                        variant.id()
-                    )),
-                },
-                &record_spec.capped_record_name,
-                &record_spec.minus_data,
-                &mut scope,
-            );
-        }
 
         let specs = FragmentGeneratorSpecs {
             record: &record_spec,
             prev_record: prev_record_spec,
         };
 
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 1] =
-            [Box::new(FromPreviousRecordImplsGenerator)];
+        let common_fragment_generators: [Box<dyn FragmentGenerator>; 2] = [
+            Box::new(FromPreviousRecordDataRecordsGenerator),
+            Box::new(FromPreviousRecordImplsGenerator),
+        ];
         let fragment_generators = common_fragment_generators
             .iter()
             .chain(config.custom_fragment_generators.iter());
