@@ -73,13 +73,13 @@ impl SerdeImplGenerator {
             .ret("Result<Self::Value, A::Error>")
             .bound("A", "serde::de::SeqAccess<'de>");
 
-        visit_seq_fn
-            .line("let size = seq.size_hint().ok_or_else(|| A::Error::custom(\"missing size\"))?;");
+        visit_seq_fn.line("if let Some(size) = seq.size_hint() {");
         visit_seq_fn.line(format!(
-            "if size != {} {{ return Err(A::Error::invalid_length(size, &\"{}\")); }}",
+            "    if size != {} {{ return Err(A::Error::invalid_length(size, &\"{}\")); }}",
             record_spec.data.len(),
             record_spec.data.len(),
         ));
+        visit_seq_fn.line("}");
 
         for datum in &record_spec.data {
             visit_seq_fn.line(format!(
@@ -90,8 +90,9 @@ impl SerdeImplGenerator {
             ));
         }
 
-        visit_seq_fn.line("let size = seq.size_hint();");
-        visit_seq_fn.line("assert_eq!(size, Some(0));");
+        visit_seq_fn.line("if let Some(size) = seq.size_hint() {");
+        visit_seq_fn.line("    assert_eq!(size, 0);");
+        visit_seq_fn.line("}");
 
         visit_seq_fn.line(format!(
             "Ok({}::new({} {{ {} }}))",

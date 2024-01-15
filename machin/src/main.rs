@@ -152,7 +152,7 @@ fn serialize_deserialize() {
     let record_0_json = serde_json::to_value(&record_0).unwrap();
     assert_eq!(record_0_json, json!([1, 2]));
 
-    let record_0: Record0 = serde_json::from_value(record_0_json).unwrap();
+    let record_0: Record0 = serde_json::from_str(&record_0_json.to_string()).unwrap();
     assert_eq!(*record_0.datum_a(), 1);
     assert_eq!(*record_0.datum_b(), 2);
 
@@ -161,7 +161,7 @@ fn serialize_deserialize() {
     let record_1_json = serde_json::to_value(&record_1).unwrap();
     assert_eq!(record_1_json, json!([1, 2, 3]));
 
-    let record_1: Record1 = serde_json::from_value(record_1_json).unwrap();
+    let record_1: Record1 = serde_json::from_str(&record_1_json.to_string()).unwrap();
     assert_eq!(*record_1.datum_a(), 1);
     assert_eq!(*record_1.datum_b(), 2);
     assert_eq!(*record_1.datum_c(), 3);
@@ -171,7 +171,7 @@ fn serialize_deserialize() {
     let record_2_json = serde_json::to_value(&record_2).unwrap();
     assert_eq!(record_2_json, json!([2, 3]));
 
-    let record_2: Record2 = serde_json::from_value(record_2_json).unwrap();
+    let record_2: Record2 = serde_json::from_str(&record_2_json.to_string()).unwrap();
     assert_eq!(*record_2.datum_b(), 2);
     assert_eq!(*record_2.datum_c(), 3);
 
@@ -185,7 +185,7 @@ fn serialize_deserialize() {
     let record_3_json = serde_json::to_value(&record_3).unwrap();
     assert_eq!(record_3_json, json!([2, 3, [2, 12, 42]]));
 
-    let record_3: Record3 = serde_json::from_value(record_3_json).unwrap();
+    let record_3: Record3 = serde_json::from_str(&record_3_json.to_string()).unwrap();
     assert_eq!(*record_3.datum_b(), 2);
     assert_eq!(*record_3.datum_c(), 3);
     assert_eq!(*record_3.datum_v(), vec![2, 12, 42]);
