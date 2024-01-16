@@ -23,14 +23,20 @@ impl SerdeImplGenerator {
             .bound("S", "serde::Serializer");
 
         if !record_spec.data.is_empty() {
-            serialize_fn.line("let mut seq = serializer.serialize_seq(None)?;");
+            serialize_fn.line(format!(
+                "let mut tuple = serializer.serialize_tuple({})?;",
+                record_spec.data.len()
+            ));
         } else {
-            serialize_fn.line("let seq = serializer.serialize_seq(None)?;");
+            serialize_fn.line("let tuple = serializer.serialize_tuple(0)?;");
         }
         for datum in &record_spec.data {
-            serialize_fn.line(format!("seq.serialize_element(self.{}())?;", datum.name()));
+            serialize_fn.line(format!(
+                "tuple.serialize_element(self.{}())?;",
+                datum.name()
+            ));
         }
-        serialize_fn.line("seq.end()");
+        serialize_fn.line("tuple.end()");
     }
 
     fn generate_visitor(record_spec: &RecordSpec, deserialize_fn: &mut Function) {
@@ -122,7 +128,8 @@ impl SerdeImplGenerator {
         Self::generate_visitor(record_spec, deserialize_fn);
 
         deserialize_fn.line(&format!(
-            "deserializer.deserialize_seq(RecordVisitor::<{}>)",
+            "deserializer.deserialize_tuple({}, RecordVisitor::<{}>)",
+            record_spec.data.len(),
             CAP
         ));
     }
@@ -130,7 +137,7 @@ impl SerdeImplGenerator {
 
 impl FragmentGenerator for SerdeImplGenerator {
     fn imports(&self, scope: &mut Scope) {
-        scope.import("serde::ser", "SerializeSeq");
+        scope.import("serde::ser", "SerializeTuple");
         scope.import("serde::de", "Error");
     }
 

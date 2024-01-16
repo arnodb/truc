@@ -139,9 +139,11 @@ fn machin() {
         record_5.datum_array_of_strings(),
         &["Hello".to_string(), "World".to_string()]
     );
+
+    println!("machin OK");
 }
 
-fn serialize_deserialize() {
+fn serialize_deserialize_json() {
     use crate::truc::serialize_deserialize::*;
 
     let record_0 = Record0::new(UnpackedRecord0 {
@@ -158,6 +160,10 @@ fn serialize_deserialize() {
     ] {
         assert_eq!(*record_0.datum_a(), 1);
         assert_eq!(*record_0.datum_b(), 2);
+        let UnpackedRecord0 {
+            datum_a: _,
+            datum_b: _,
+        } = record_0.unpack();
     }
 
     let record_1 = Record1::from((record_0, UnpackedRecordIn1 { datum_c: 3 }));
@@ -172,6 +178,11 @@ fn serialize_deserialize() {
         assert_eq!(*record_1.datum_a(), 1);
         assert_eq!(*record_1.datum_b(), 2);
         assert_eq!(*record_1.datum_c(), 3);
+        let UnpackedRecord1 {
+            datum_a: _,
+            datum_b: _,
+            datum_c: _,
+        } = record_1.unpack();
     }
 
     let record_2 = Record2::from((record_1, UnpackedRecordIn2 {}));
@@ -185,6 +196,10 @@ fn serialize_deserialize() {
     ] {
         assert_eq!(*record_2.datum_b(), 2);
         assert_eq!(*record_2.datum_c(), 3);
+        let UnpackedRecord2 {
+            datum_b: _,
+            datum_c: _,
+        } = record_2.unpack();
     }
 
     let record_3 = Record3::from((
@@ -204,11 +219,112 @@ fn serialize_deserialize() {
         assert_eq!(*record_3.datum_b(), 2);
         assert_eq!(*record_3.datum_c(), 3);
         assert_eq!(*record_3.datum_v(), vec![2, 12, 42]);
+        let UnpackedRecord3 {
+            datum_b: _,
+            datum_c: _,
+            datum_v: _,
+        } = record_3.unpack();
     }
+
+    let record_4 = Record4::from((record_3, UnpackedRecordIn4 {}));
+
+    let record_4_json = serde_json::to_value(&record_4).unwrap();
+    assert_eq!(record_4_json, json!([]));
+
+    for record_4 in [
+        serde_json::from_str::<Record4>(&record_4_json.to_string()).unwrap(),
+        serde_json::from_value::<Record4>(record_4_json).unwrap(),
+    ] {
+        let UnpackedRecord4 {} = record_4.unpack();
+    }
+
+    println!("serialize_deserialize_json OK");
+}
+
+fn serialize_deserialize_bincode() {
+    use crate::truc::serialize_deserialize::*;
+
+    let record_0 = Record0::new(UnpackedRecord0 {
+        datum_a: 1,
+        datum_b: 2,
+    });
+
+    let record_0_bincode = bincode::serialize(&record_0).unwrap();
+
+    {
+        let record_0 = bincode::deserialize::<Record0>(&record_0_bincode).unwrap();
+        assert_eq!(*record_0.datum_a(), 1);
+        assert_eq!(*record_0.datum_b(), 2);
+        let UnpackedRecord0 {
+            datum_a: _,
+            datum_b: _,
+        } = record_0.unpack();
+    }
+
+    let record_1 = Record1::from((record_0, UnpackedRecordIn1 { datum_c: 3 }));
+
+    let record_1_bincode = bincode::serialize(&record_1).unwrap();
+
+    {
+        let record_1 = bincode::deserialize::<Record1>(&record_1_bincode).unwrap();
+        assert_eq!(*record_1.datum_a(), 1);
+        assert_eq!(*record_1.datum_b(), 2);
+        assert_eq!(*record_1.datum_c(), 3);
+        let UnpackedRecord1 {
+            datum_a: _,
+            datum_b: _,
+            datum_c: _,
+        } = record_1.unpack();
+    }
+
+    let record_2 = Record2::from((record_1, UnpackedRecordIn2 {}));
+
+    let record_2_bincode = bincode::serialize(&record_2).unwrap();
+
+    {
+        let record_2 = bincode::deserialize::<Record2>(&record_2_bincode).unwrap();
+        assert_eq!(*record_2.datum_b(), 2);
+        assert_eq!(*record_2.datum_c(), 3);
+        let UnpackedRecord2 {
+            datum_b: _,
+            datum_c: _,
+        } = record_2.unpack();
+    }
+
+    let record_3 = Record3::from((
+        record_2,
+        UnpackedRecordIn3 {
+            datum_v: vec![2, 12, 42],
+        },
+    ));
+
+    let record_3_bincode = bincode::serialize(&record_3).unwrap();
+
+    {
+        let record_3 = bincode::deserialize::<Record3>(&record_3_bincode).unwrap();
+        assert_eq!(*record_3.datum_b(), 2);
+        assert_eq!(*record_3.datum_c(), 3);
+        assert_eq!(*record_3.datum_v(), vec![2, 12, 42]);
+        let UnpackedRecord3 {
+            datum_b: _,
+            datum_c: _,
+            datum_v: _,
+        } = record_3.unpack();
+    }
+
+    let record_4 = Record4::from((record_3, UnpackedRecordIn4 {}));
+
+    let record_4_bincode = bincode::serialize(&record_4).unwrap();
+
+    let record_4 = bincode::deserialize::<Record4>(&record_4_bincode).unwrap();
+    let UnpackedRecord4 {} = record_4.unpack();
+
+    println!("serialize_deserialize_bincode OK");
 }
 
 fn main() -> Result<(), String> {
     machin();
-    serialize_deserialize();
+    serialize_deserialize_json();
+    serialize_deserialize_bincode();
     Ok(())
 }
