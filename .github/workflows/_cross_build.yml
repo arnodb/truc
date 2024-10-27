@@ -21,7 +21,7 @@ jobs:
 
   cross-build:
 
-    name: Rust ${{ inputs.rust_toolchain }}, target ${{ inputs.target }}
+    name: Rust ${{ inputs.rust_toolchain }}, target ${{ inputs.target }}, ${{ inputs.rust_features }}
 
     runs-on: ubuntu-latest
 
