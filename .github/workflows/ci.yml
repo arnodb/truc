@@ -4,103 +4,48 @@ on:
   workflow_dispatch:
   push:
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
 
-  test:
+  main_stable:
+    name: Rust stable
+    uses: ./.github/workflows/_build.yml
+    with:
+      rust_toolchain: stable
+      with_rustfmt: true
 
-    name: Rust ${{ matrix.rust }}
+  main_1_56_1:
+    name: Rust 1.56.1
+    uses: ./.github/workflows/_build.yml
+    with:
+      rust_toolchain: 1.56.1
+      with_clippy: true
+      pre_build_script: ./scripts/msrv_pin_dependencies.sh
 
-    runs-on: ubuntu-latest
+  cross_stable_i686:
+    name: Rust stable i686-unknown-linux-gnu
+    uses: ./.github/workflows/_cross_build.yml
+    with:
+      target: i686-unknown-linux-gnu
+      rust_toolchain: stable
 
-    outputs:
-      passed_rustfmt: ${{ steps.rustfmt.outputs.passed_rustfmt }}
-      passed_clippy: ${{ steps.clippy.outputs.passed_clippy }}
+  cross_stable_aarch64:
+    name: Rust stable aarch64-unknown-linux-gnu
+    uses: ./.github/workflows/_cross_build.yml
+    with:
+      target: aarch64-unknown-linux-gnu
+      rust_toolchain: stable
 
-    strategy:
-      fail-fast: false
-      matrix:
-        rust: [1.56.1, stable]
+  cross_1_65_0_i686:
+    name: Rust 1.65.0 i686-unknown-linux-gnu
+    uses: ./.github/workflows/_cross_build.yml
+    with:
+      target: i686-unknown-linux-gnu
+      rust_toolchain: 1.65.0
 
-    steps:
+  cross_1_65_0_aarch64:
+    name: Rust 1.65.0 aarch64-unknown-linux-gnu
+    uses: ./.github/workflows/_cross_build.yml
+    with:
+      target: aarch64-unknown-linux-gnu
+      rust_toolchain: 1.65.0
 
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-          components: rustfmt, clippy
-
-      - id: rustfmt
-        name: Rust format
-        if: ${{ matrix.rust == 'stable' }}
-        run: |
-          cargo fmt --verbose --all -- --check
-          echo "passed_rustfmt=${{ matrix.rust }}" >> "$GITHUB_OUTPUT"
-
-      - id: clippy
-        name: Clippy
-        if: ${{ matrix.rust == '1.56.1' }}
-        run: |
-          cargo clippy --all --all-features --all-targets -- -D warnings
-          echo "passed_clippy=${{ matrix.rust }}" >> "$GITHUB_OUTPUT"
-
-      - id: test
-        name: Compile and run tests
-        run: cargo test --verbose
-
-  code-checks:
-
-    name: Code checks
-
-    runs-on: ubuntu-latest
-
-    needs: test
-
-    steps:
-
-      - name: Rustfmt
-        run: |
-          echo "Rustfmt run on ${{ needs.test.outputs.passed_rustfmt }}" >> "$GITHUB_STEP_SUMMARY"
-          test "${{ needs.test.outputs.passed_rustfmt }}" = "stable"
-
-      - name: Clippy
-        run: |
-          echo "Clippy run on ${{ needs.test.outputs.passed_clippy }}" >> "$GITHUB_STEP_SUMMARY"
-          test "${{ needs.test.outputs.passed_clippy }}" = "1.56.1"
-
-  cross-test:
-
-    name: Rust ${{ matrix.rust }}, target ${{ matrix.target }}
-
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        rust: [1.65.0, stable]
-        target: [i686-unknown-linux-gnu, aarch64-unknown-linux-gnu]
-
-    env:
-      TRUC_CROSS: yes
-
-    steps:
-
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-
-      - run: |
-          curl -OL "https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz"
-          mkdir cross
-          tar -C cross -xvzf cross-x86_64-unknown-linux-gnu.tar.gz
-
-      - run: |
-          mkdir -p "target/shared_machin/${{ matrix.target }}/debug"
-          ./cross/cross run --target "${{ matrix.target }}" -p machin_target_types >| "target/shared_machin/${{ matrix.target }}/debug/target_types.json"
-
-      - run: ./cross/cross test --target ${{ matrix.target }} -vv

@@ -1,0 +1,48 @@
+name: Cross Build
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      rust_toolchain:
+        required: true
+        type: string
+      rust_features:
+        required: false
+        type: string
+        default: --all-features
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  cross-build:
+
+    name: Rust ${{ inputs.rust_toolchain }}, target ${{ inputs.target }}
+
+    runs-on: ubuntu-latest
+
+    env:
+      TRUC_CROSS: yes
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust_toolchain }}
+
+      - run: |
+          curl -OL "https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir cross
+          tar -C cross -xvzf cross-x86_64-unknown-linux-gnu.tar.gz
+
+      - run: |
+          mkdir -p "target/shared_machin/${{ inputs.target }}/debug"
+          ./cross/cross run --target "${{ inputs.target }}" -p machin_target_types >| "target/shared_machin/${{ inputs.target }}/debug/target_types.json"
+
+      - run: ./cross/cross test --target ${{ inputs.target }} -vv
