@@ -45,4 +45,4 @@ jobs:
           mkdir -p "target/shared_machin/${{ inputs.target }}/debug"
           ./cross/cross run --target "${{ inputs.target }}" -p machin_target_types >| "target/shared_machin/${{ inputs.target }}/debug/target_types.json"
 
-      - run: ./cross/cross test --target ${{ inputs.target }} -vv
+      - run: ./cross/cross test ${{ inputs.rust_features }} --target ${{ inputs.target }} -vv

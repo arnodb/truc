@@ -1,4 +1,5 @@
 #![cfg_attr(test, allow(clippy::many_single_char_names))]
+#![cfg_attr(feature = "unstable", feature(non_exhaustive_omitted_patterns_lint))]
 
 #[macro_use]
 extern crate derive_more;

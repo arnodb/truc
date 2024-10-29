@@ -12,6 +12,7 @@ pub fn truc_dynamic_type_name(type_name: &str) -> String {
 }
 
 fn rewrite_type(syn_type: &mut syn::Type) {
+    #[cfg_attr(all(test, feature = "unstable"), deny(non_exhaustive_omitted_patterns))]
     match syn_type {
         syn::Type::Array(syn::TypeArray {
             bracket_token: _,
@@ -160,7 +161,6 @@ fn rewrite_type(syn_type: &mut syn::Type) {
         syn::Type::Verbatim(_) => {
             unimplemented!("{:?}", syn_type);
         }
-        #[cfg_attr(all(test, nightly), deny(non_exhaustive_omitted_patterns))]
         _ => {
             unimplemented!("{:?}", syn_type);
         }
