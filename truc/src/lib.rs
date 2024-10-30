@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::many_single_char_names))]
 #![cfg_attr(feature = "unstable", feature(non_exhaustive_omitted_patterns_lint))]
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 #[macro_use]
 extern crate derive_more;
@@ -12,6 +13,7 @@ pub mod generator;
 pub mod record;
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
 

@@ -124,51 +124,57 @@ where
     }
 }
 
-#[test]
-fn test_drop_all_input_and_reduced_output() {
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    };
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
 
-    struct CountDrop {
-        value: usize,
-        dropped: Arc<AtomicUsize>,
-    }
+    #[test]
+    fn test_drop_all_input_and_reduced_output() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
 
-    impl Drop for CountDrop {
-        fn drop(&mut self) {
-            self.dropped.fetch_add(1, Ordering::Relaxed);
+        struct CountDrop {
+            value: usize,
+            dropped: Arc<AtomicUsize>,
         }
-    }
 
-    let dropped1 = Arc::new(AtomicUsize::new(0));
-    let dropped2 = Arc::new(AtomicUsize::new(0));
+        impl Drop for CountDrop {
+            fn drop(&mut self) {
+                self.dropped.fetch_add(1, Ordering::Relaxed);
+            }
+        }
 
-    let mut input = Vec::new();
-    for value in 0..32 {
-        input.push(CountDrop {
-            value,
-            dropped: dropped1.clone(),
+        let dropped1 = Arc::new(AtomicUsize::new(0));
+        let dropped2 = Arc::new(AtomicUsize::new(0));
+
+        let mut input = Vec::new();
+        for value in 0..32 {
+            input.push(CountDrop {
+                value,
+                dropped: dropped1.clone(),
+            });
+        }
+
+        let output = convert_vec_in_place::<CountDrop, CountDrop, _>(input, |rec, _| {
+            if rec.value % 4 == 0 {
+                VecElementConversionResult::Converted(CountDrop {
+                    value: rec.value,
+                    dropped: dropped2.clone(),
+                })
+            } else {
+                VecElementConversionResult::Abandonned
+            }
         });
+
+        assert_eq!(output.len(), 8);
+
+        assert_eq!(dropped1.load(Ordering::Relaxed), 32);
+
+        drop(output);
+
+        assert_eq!(dropped2.load(Ordering::Relaxed), 8);
     }
-
-    let output = convert_vec_in_place::<CountDrop, CountDrop, _>(input, |rec, _| {
-        if rec.value % 4 == 0 {
-            VecElementConversionResult::Converted(CountDrop {
-                value: rec.value,
-                dropped: dropped2.clone(),
-            })
-        } else {
-            VecElementConversionResult::Abandonned
-        }
-    });
-
-    assert_eq!(output.len(), 8);
-
-    assert_eq!(dropped1.load(Ordering::Relaxed), 32);
-
-    drop(output);
-
-    assert_eq!(dropped2.load(Ordering::Relaxed), 8);
 }

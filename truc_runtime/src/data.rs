@@ -56,37 +56,43 @@ impl<const CAP: usize> Default for RecordMaybeUninit<CAP> {
     }
 }
 
-#[test]
-fn test_size_of_record() {
-    assert_eq!(std::mem::size_of::<RecordMaybeUninit<0>>(), 0);
-    assert_eq!(std::mem::size_of::<RecordMaybeUninit<1>>(), 1);
-    assert_eq!(std::mem::size_of::<RecordMaybeUninit<12>>(), 12);
-    assert_eq!(std::mem::size_of::<RecordMaybeUninit<42>>(), 42);
-}
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_record_write_read_drop() {
-    static mut COUNTER: usize = 0;
+    #[test]
+    fn test_size_of_record() {
+        assert_eq!(std::mem::size_of::<RecordMaybeUninit<0>>(), 0);
+        assert_eq!(std::mem::size_of::<RecordMaybeUninit<1>>(), 1);
+        assert_eq!(std::mem::size_of::<RecordMaybeUninit<12>>(), 12);
+        assert_eq!(std::mem::size_of::<RecordMaybeUninit<42>>(), 42);
+    }
 
-    struct Foo {}
+    #[test]
+    fn test_record_write_read_drop() {
+        static mut COUNTER: usize = 0;
 
-    impl Drop for Foo {
-        fn drop(&mut self) {
-            unsafe {
-                COUNTER += 1;
+        struct Foo {}
+
+        impl Drop for Foo {
+            fn drop(&mut self) {
+                unsafe {
+                    COUNTER += 1;
+                }
             }
         }
+
+        const CAP: usize = std::mem::size_of::<Foo>();
+
+        let mut record = RecordMaybeUninit::<CAP>::new();
+        unsafe {
+            record.write(0, Foo {});
+        }
+        let foo = unsafe { record.read::<Foo>(0) };
+        drop(foo);
+
+        let counter = unsafe { COUNTER };
+        assert_eq!(counter, 1);
     }
-
-    const CAP: usize = std::mem::size_of::<Foo>();
-
-    let mut record = RecordMaybeUninit::<CAP>::new();
-    unsafe {
-        record.write(0, Foo {});
-    }
-    let foo = unsafe { record.read::<Foo>(0) };
-    drop(foo);
-
-    let counter = unsafe { COUNTER };
-    assert_eq!(counter, 1);
 }

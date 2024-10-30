@@ -10,3 +10,6 @@ repository = "https://github.com/arnodb/truc"
 readme = "../README.md"
 
 [dependencies]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }

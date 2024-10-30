@@ -29,3 +29,6 @@ rand_chacha = "0.3"
 full = []
 full_unstable = ["unstable"]
 unstable = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }

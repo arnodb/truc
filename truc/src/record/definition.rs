@@ -544,6 +544,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
