@@ -1,5 +1,4 @@
 #![cfg_attr(test, allow(clippy::many_single_char_names))]
-#![cfg_attr(feature = "unstable", feature(non_exhaustive_omitted_patterns_lint))]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 #[macro_use]

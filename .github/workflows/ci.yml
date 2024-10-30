@@ -11,7 +11,6 @@ jobs:
     uses: ./.github/workflows/_build.yml
     with:
       rust_toolchain: stable
-      rust_features: --features "full"
       with_rustfmt: true
 
   main_1_56_1:
@@ -19,7 +18,6 @@ jobs:
     uses: ./.github/workflows/_build.yml
     with:
       rust_toolchain: 1.56.1
-      rust_features: --features "full"
       with_clippy: true
       pre_build_script: ./scripts/msrv_pin_dependencies.sh
 
@@ -28,7 +26,6 @@ jobs:
     uses: ./.github/workflows/_build.yml
     with:
       rust_toolchain: nightly
-      rust_features: --all-features
 
   cross_stable_i686:
     name: Rust stable i686-unknown-linux-gnu
@@ -36,7 +33,6 @@ jobs:
     with:
       target: i686-unknown-linux-gnu
       rust_toolchain: stable
-      rust_features: --features "full"
 
   cross_stable_aarch64:
     name: Rust stable aarch64-unknown-linux-gnu
@@ -44,7 +40,6 @@ jobs:
     with:
       target: aarch64-unknown-linux-gnu
       rust_toolchain: stable
-      rust_features: --features "full"
 
   cross_1_65_0_i686:
     name: Rust 1.65.0 i686-unknown-linux-gnu
@@ -52,7 +47,6 @@ jobs:
     with:
       target: i686-unknown-linux-gnu
       rust_toolchain: 1.65.0
-      rust_features: --features "full"
 
   cross_1_65_0_aarch64:
     name: Rust 1.65.0 aarch64-unknown-linux-gnu
@@ -60,5 +54,4 @@ jobs:
     with:
       target: aarch64-unknown-linux-gnu
       rust_toolchain: 1.65.0
-      rust_features: --features "full"
 

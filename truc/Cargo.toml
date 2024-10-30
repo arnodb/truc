@@ -18,17 +18,12 @@ proc-macro2 = "1"
 quote = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-syn = { version = "1", features = ["full", "extra-traits"] }
+syn = { version = "1", features = ["full", "extra-traits", "visit-mut"] }
 truc_runtime = { version = "0.1.2-dev", path = "../truc_runtime" }
 
 [dev-dependencies]
 rand = "0.8"
 rand_chacha = "0.3"
-
-[features]
-full = []
-full_unstable = ["unstable"]
-unstable = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }
