@@ -179,6 +179,10 @@ impl StaticTypeResolver {
         add_type_and_arrays!(Vec<()>);
     }
 
+    pub fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
+        serde_json::to_value(&self.types)
+    }
+
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self.types)
     }
@@ -210,5 +214,96 @@ impl TypeResolver for StaticTypeResolver {
             .get(&type_name)
             .unwrap_or_else(|| panic!("Could not resolve type {}", type_name))
             .clone()
+    }
+}
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_static_type_resolver() {
+        let mut type_infos = StaticTypeResolver::default();
+
+        type_infos.add_std_types();
+
+        let json = type_infos.to_json_value().unwrap();
+        type_infos.to_json_string().unwrap();
+        type_infos.to_json_string_pretty().unwrap();
+
+        let types = json.as_object().unwrap();
+
+        for t in [
+            "usize",
+            "isize",
+            "f32",
+            "f64",
+            "char",
+            "bool",
+            "String",
+            "Box < str >",
+            "Vec < () >",
+        ] {
+            assert!(types.contains_key(&t.to_owned()), "{}", t);
+            assert!(types.contains_key(&format!("[{} ; 2]", t)), "[{} ; 2]", t);
+            assert!(types.contains_key(&format!("[{} ; 10]", t)), "[{} ; 10]", t);
+        }
+
+        let name = assert_matches!(
+            type_infos.type_info::<usize>(),
+            TypeInfo {
+                name,
+                size: _,
+                align: _
+            } => name
+        );
+        assert_eq!(name, "usize");
+
+        let name = assert_matches!(
+            type_infos.dynamic_type_info("isize"),
+            DynamicTypeInfo {
+                info: TypeInfo {
+                    name,
+                    size: _,
+                    align: _
+                },
+                allow_uninit: true,
+            } => name
+        );
+        assert_eq!(name, "isize");
+
+        let name = assert_matches!(
+            type_infos.dynamic_type_info("String"),
+            DynamicTypeInfo {
+                info: TypeInfo {
+                    name,
+                    size: _,
+                    align: _
+                },
+                allow_uninit: false,
+            } => name
+        );
+        assert_eq!(name, "String");
+    }
+
+    #[test]
+    fn test_type_added_twice() {
+        let mut type_infos = StaticTypeResolver::default();
+
+        type_infos.add_type::<usize>();
+
+        let result = std::panic::catch_unwind(move || type_infos.add_type::<usize>());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_type_added_twice_allow_uninit() {
+        let mut type_infos = StaticTypeResolver::default();
+
+        type_infos.add_type_allow_uninit::<usize>();
+
+        let result = std::panic::catch_unwind(move || type_infos.add_type_allow_uninit::<usize>());
+        assert!(result.is_err());
     }
 }

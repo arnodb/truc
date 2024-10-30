@@ -1,6 +1,9 @@
 #![cfg_attr(test, allow(clippy::many_single_char_names))]
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
+#[cfg(test)]
+#[macro_use]
+extern crate assert_matches;
 #[macro_use]
 extern crate derive_more;
 #[macro_use]
