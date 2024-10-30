@@ -1,6 +1,8 @@
+use maplit::btreemap;
+use std::{collections::BTreeMap, prelude::v1::*};
 use syn::{
     visit_mut::{visit_type_path_mut, VisitMut},
-    Path, TypePath,
+    Path, PathSegment, Type, TypePath,
 };
 
 pub fn truc_type_name<T: ?Sized>() -> String {
@@ -9,12 +11,12 @@ pub fn truc_type_name<T: ?Sized>() -> String {
 }
 
 pub fn truc_dynamic_type_name(type_name: &str) -> String {
-    let mut syn_type = syn::parse_str::<syn::Type>(type_name).expect("syn type");
+    let mut syn_type = syn::parse_str::<Type>(type_name).expect("syn type");
     rewrite_type(&mut syn_type);
     quote!(#syn_type).to_string()
 }
 
-fn rewrite_type(syn_type: &mut syn::Type) {
+fn rewrite_type(syn_type: &mut Type) {
     TypeRewriter.visit_type_mut(syn_type);
 }
 
@@ -29,75 +31,30 @@ impl VisitMut for TypeRewriter {
                 segments,
             },
         } = i;
-        let mut matched;
-        matched = {
-            leading_colon.is_none() && {
-                let mut seg_iter = segments.iter_mut();
-                match_segment(seg_iter.next(), "alloc", || {
-                    match_segment(seg_iter.next(), "string", || {
-                        match_segment(seg_iter.next(), "String", || seg_iter.next().is_none())
-                    })
-                })
-            }
-        };
-        if matched {
-            let mut seg = segments.pop().expect("segment").into_value();
-            seg.ident = syn::Ident::new("String", proc_macro2::Span::call_site());
-            segments.clear();
-            segments.push(seg);
-        }
-        if !matched {
-            matched = {
-                leading_colon.is_none() && {
-                    let mut seg_iter = segments.iter_mut();
-                    match_segment(seg_iter.next(), "alloc", || {
-                        match_segment(seg_iter.next(), "boxed", || {
-                            match_segment_with_arguments(seg_iter.next(), "Box", || {
-                                seg_iter.next().is_none()
-                            })
-                        })
-                    })
-                }
-            };
-            if matched {
-                let mut seg = segments.pop().expect("segment").into_value();
-                seg.ident = syn::Ident::new("Box", proc_macro2::Span::call_site());
-                segments.clear();
-                segments.push(seg);
-            }
-        }
-        if !matched {
-            matched = leading_colon.is_none() && {
-                let mut seg_iter = segments.iter_mut();
-                match_segment(seg_iter.next(), "core", || {
-                    match_segment(seg_iter.next(), "option", || {
-                        match_segment_with_arguments(seg_iter.next(), "Option", || {
-                            seg_iter.next().is_none()
-                        })
-                    })
-                })
-            };
-            if matched {
-                let mut seg = segments.pop().expect("segment").into_value();
-                seg.ident = syn::Ident::new("Option", proc_macro2::Span::call_site());
-                segments.clear();
-                segments.push(seg);
-            }
-        }
-        if !matched {
-            matched = leading_colon.is_none() && {
-                let mut seg_iter = segments.iter_mut();
-                match_segment(seg_iter.next(), "core", || {
-                    match_segment(seg_iter.next(), "result", || {
-                        match_segment_with_arguments(seg_iter.next(), "Result", || {
-                            seg_iter.next().is_none()
-                        })
-                    })
-                })
-            };
-            if matched {
-                let mut seg = segments.pop().expect("segment").into_value();
-                seg.ident = syn::Ident::new("Result", proc_macro2::Span::call_site());
+        if leading_colon.is_none() {
+            let in_scope_types = PatternSegments(btreemap! {
+                "alloc" => PatternSegments(btreemap!{
+                    "boxed" => PatternSegments(btreemap!{
+                        "Box" => PatternSegments(btreemap!{}),
+                    }),
+                    "string" => PatternSegments(btreemap!{
+                        "String" => PatternSegments(btreemap!{}),
+                    }),
+                    "vec" => PatternSegments(btreemap!{
+                        "Vec" => PatternSegments(btreemap!{}),
+                    }),
+                }),
+                "core" => PatternSegments(btreemap!{
+                    "option" => PatternSegments(btreemap!{
+                        "Option" => PatternSegments(btreemap!{}),
+                    }),
+                    "result" => PatternSegments(btreemap!{
+                        "Result" => PatternSegments(btreemap!{}),
+                    }),
+                }),
+            });
+            if match_segments(segments.iter(), &in_scope_types) {
+                let seg = segments.pop().expect("segment").into_value();
                 segments.clear();
                 segments.push(seg);
             }
@@ -106,51 +63,25 @@ impl VisitMut for TypeRewriter {
     }
 }
 
-fn match_segment<F>(segment: Option<&mut syn::PathSegment>, value: &str, f: F) -> bool
-where
-    F: FnOnce() -> bool,
-{
-    if let Some(syn::PathSegment {
-        ident,
-        arguments: syn::PathArguments::None,
-    }) = segment
-    {
-        if ident == &mut syn::Ident::new(value, proc_macro2::Span::call_site()) {
-            f()
-        } else {
-            false
-        }
-    } else {
-        false
-    }
-}
+struct PatternSegments<'a>(BTreeMap<&'a str, Self>);
 
-fn match_segment_with_arguments<F>(
-    segment: Option<&mut syn::PathSegment>,
-    value: &str,
-    f: F,
-) -> bool
-where
-    F: FnOnce() -> bool,
-{
-    if let Some(syn::PathSegment {
+fn match_segments<'a>(
+    mut segments: impl Iterator<Item = &'a PathSegment>,
+    values: &'a PatternSegments<'a>,
+) -> bool {
+    if let Some(PathSegment {
         ident,
-        arguments:
-            syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
-                colon2_token: None,
-                lt_token: _,
-                args: _,
-                gt_token: _,
-            }),
-    }) = segment
+        arguments: _,
+    }) = segments.next()
     {
-        if ident == &mut syn::Ident::new(value, proc_macro2::Span::call_site()) {
-            f()
-        } else {
-            false
+        for (value, next) in &values.0 {
+            if ident == value {
+                return match_segments(segments, next);
+            }
         }
-    } else {
         false
+    } else {
+        values.0.is_empty()
     }
 }
 
@@ -183,6 +114,12 @@ mod tests {
     fn option_type_name() {
         assert_eq!(&*truc_type_name::<Option<u32>>(), "Option < u32 >");
         assert_eq!(&*truc_type_name::<Option<String>>(), "Option < String >");
+    }
+
+    #[test]
+    fn vev_type_name() {
+        assert_eq!(&*truc_type_name::<Vec<u32>>(), "Vec < u32 >");
+        assert_eq!(&*truc_type_name::<Vec<String>>(), "Vec < String >");
     }
 
     #[test]
