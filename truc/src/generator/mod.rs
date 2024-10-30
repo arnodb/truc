@@ -303,7 +303,10 @@ mod tests {
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
-    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
+    use crate::record::{
+        definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
+        type_resolver::StaticTypeResolver,
+    };
 
     use super::*;
 
@@ -312,7 +315,11 @@ mod tests {
         let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
         println!("Seed: {:#04x?}", rng.get_seed());
 
-        let type_resolver = HostTypeResolver;
+        let type_resolver = {
+            let mut resolver = StaticTypeResolver::default();
+            resolver.add_std_types();
+            resolver
+        };
 
         const MAX_DATA: usize = 32;
         for _ in 0..256 {
@@ -320,7 +327,7 @@ mod tests {
             let num_data = rng.gen_range(0..=MAX_DATA);
             let add_one = |definition: &mut RecordDefinitionBuilder<_>,
                            rng: &mut rand_chacha::ChaCha8Rng,
-                           i: usize| match rng.gen_range(0..5) {
+                           i: usize| match rng.gen_range(0..7) {
                 0 => {
                     definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i));
                 }
@@ -335,6 +342,20 @@ mod tests {
                 }
                 4 => {
                     definition.add_datum::<String, _>(format!("field_{}", i));
+                }
+                5 => {
+                    definition.add_dynamic_datum(format!("field_{}", i), "Box<str>");
+                }
+                6 => {
+                    definition.add_datum_override::<Vec<()>, _>(
+                        format!("field_{}", i),
+                        DatumDefinitionOverride {
+                            type_name: Some("Vec<usize>".to_owned()),
+                            size: None,
+                            align: None,
+                            allow_uninit: None,
+                        },
+                    );
                 }
                 i => unreachable!("Unhandled value {}", i),
             };
