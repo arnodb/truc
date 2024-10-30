@@ -305,13 +305,52 @@ mod tests {
 
     use crate::record::{
         definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
-        type_resolver::StaticTypeResolver,
+        type_resolver::{StaticTypeResolver, TypeResolver},
     };
 
     use super::*;
 
+    fn add_one<R: TypeResolver>(
+        definition: &mut RecordDefinitionBuilder<R>,
+        rng: &mut rand_chacha::ChaCha8Rng,
+        i: usize,
+    ) {
+        match rng.gen_range(0..7) {
+            0 => {
+                definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i));
+            }
+            1 => {
+                definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i));
+            }
+            2 => {
+                definition.add_datum_allow_uninit::<u32, _>(format!("field_{}", i));
+            }
+            3 => {
+                definition.add_datum_allow_uninit::<u64, _>(format!("field_{}", i));
+            }
+            4 => {
+                definition.add_datum::<String, _>(format!("field_{}", i));
+            }
+            5 => {
+                definition.add_dynamic_datum(format!("field_{}", i), "Box<str>");
+            }
+            6 => {
+                definition.add_datum_override::<Vec<()>, _>(
+                    format!("field_{}", i),
+                    DatumDefinitionOverride {
+                        type_name: Some("Vec<usize>".to_owned()),
+                        size: None,
+                        align: None,
+                        allow_uninit: None,
+                    },
+                );
+            }
+            i => unreachable!("Unhandled value {}", i),
+        };
+    }
+
     #[test]
-    fn should_align_offsets_according_to_rust_alignment_rules() {
+    fn generators_with_random_definitions() {
         let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
         println!("Seed: {:#04x?}", rng.get_seed());
 
@@ -325,47 +364,17 @@ mod tests {
         for _ in 0..256 {
             let mut definition = RecordDefinitionBuilder::new(&type_resolver);
             let num_data = rng.gen_range(0..=MAX_DATA);
-            let add_one = |definition: &mut RecordDefinitionBuilder<_>,
-                           rng: &mut rand_chacha::ChaCha8Rng,
-                           i: usize| match rng.gen_range(0..7) {
-                0 => {
-                    definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i));
-                }
-                1 => {
-                    definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i));
-                }
-                2 => {
-                    definition.add_datum_allow_uninit::<u32, _>(format!("field_{}", i));
-                }
-                3 => {
-                    definition.add_datum_allow_uninit::<u64, _>(format!("field_{}", i));
-                }
-                4 => {
-                    definition.add_datum::<String, _>(format!("field_{}", i));
-                }
-                5 => {
-                    definition.add_dynamic_datum(format!("field_{}", i), "Box<str>");
-                }
-                6 => {
-                    definition.add_datum_override::<Vec<()>, _>(
-                        format!("field_{}", i),
-                        DatumDefinitionOverride {
-                            type_name: Some("Vec<usize>".to_owned()),
-                            size: None,
-                            align: None,
-                            allow_uninit: None,
-                        },
-                    );
-                }
-                i => unreachable!("Unhandled value {}", i),
-            };
             for i in 0..num_data {
                 add_one(&mut definition, &mut rng, i);
             }
             definition.close_record_variant();
+            let mut removed = BTreeSet::new();
             for _ in 0..(num_data / 5) {
                 let index = rng.gen_range(0..definition.data().len());
-                definition.remove_datum(definition.data()[index].id());
+                if !removed.contains(&index) {
+                    removed.insert(index);
+                    definition.remove_datum(definition.data()[index].id());
+                }
             }
             for i in 0..(num_data / 5) {
                 add_one(&mut definition, &mut rng, num_data + i);

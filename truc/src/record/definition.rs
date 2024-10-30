@@ -361,6 +361,9 @@ where
         if let Some(variant) = self.variants.last() {
             let index = variant.data.iter().position(|&did| did == datum_id);
             if index.is_some() {
+                if self.data_to_remove.contains(&datum_id) {
+                    panic!("Datum with id = {} is already removed", datum_id);
+                }
                 self.data_to_remove.push(datum_id);
             } else {
                 panic!(
@@ -551,10 +554,37 @@ where
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use std::collections::BTreeSet;
+
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
-    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
+    use crate::record::{
+        definition::RecordDefinitionBuilder,
+        type_resolver::{HostTypeResolver, TypeResolver},
+    };
+
+    fn add_one<R: TypeResolver>(
+        definition: &mut RecordDefinitionBuilder<R>,
+        rng: &mut rand_chacha::ChaCha8Rng,
+        i: usize,
+    ) {
+        match rng.gen_range(0..4) {
+            0 => {
+                definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i));
+            }
+            1 => {
+                definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i));
+            }
+            2 => {
+                definition.add_datum_allow_uninit::<u32, _>(format!("field_{}", i));
+            }
+            3 => {
+                definition.add_datum_allow_uninit::<u64, _>(format!("field_{}", i));
+            }
+            i => unreachable!("Unhandled value {}", i),
+        }
+    }
 
     #[test]
     fn should_align_offsets_according_to_rust_alignment_rules() {
@@ -567,30 +597,17 @@ mod tests {
         for _ in 0..256 {
             let mut definition = RecordDefinitionBuilder::new(&type_resolver);
             let num_data = rng.gen_range(0..=MAX_DATA);
-            let add_one = |definition: &mut RecordDefinitionBuilder<_>,
-                           rng: &mut rand_chacha::ChaCha8Rng,
-                           i: usize| match rng.gen_range(0..4) {
-                0 => {
-                    definition.add_datum::<u8, _>(format!("field_{}", i));
-                }
-                1 => {
-                    definition.add_datum::<u16, _>(format!("field_{}", i));
-                }
-                2 => {
-                    definition.add_datum::<u32, _>(format!("field_{}", i));
-                }
-                3 => {
-                    definition.add_datum::<u64, _>(format!("field_{}", i));
-                }
-                i => unreachable!("Unhandled value {}", i),
-            };
             for i in 0..num_data {
                 add_one(&mut definition, &mut rng, i);
             }
             definition.close_record_variant();
+            let mut removed = BTreeSet::new();
             for _ in 0..(num_data / 5) {
-                let index = rng.gen_range(0..definition.datum_definitions.data.len());
-                definition.remove_datum(definition.datum_definitions.data[index].id());
+                let index = rng.gen_range(0..definition.data().len());
+                if !removed.contains(&index) {
+                    removed.insert(index);
+                    definition.remove_datum(definition.data()[index].id());
+                }
             }
             for i in 0..(num_data / 5) {
                 add_one(&mut definition, &mut rng, num_data + i);
@@ -612,6 +629,65 @@ mod tests {
                     let datum1 = &def[w[0]];
                     let datum2 = &def[w[1]];
                     assert!(datum1.offset + datum1.size() <= datum2.offset);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn should_access_data_definition_by_name() {
+        let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
+        println!("Seed: {:#04x?}", rng.get_seed());
+
+        let type_resolver = HostTypeResolver;
+
+        const MAX_DATA: usize = 32;
+        for _ in 0..256 {
+            let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+            let first_variant_field_name = "first_variant_field";
+            let first_datum_id =
+                definition.add_datum_allow_uninit::<usize, _>(first_variant_field_name);
+            definition.close_record_variant();
+            definition.remove_datum(first_datum_id);
+            let num_data = rng.gen_range(0..=MAX_DATA);
+            for i in 0..num_data {
+                add_one(&mut definition, &mut rng, i);
+            }
+            {
+                assert_eq!(definition.variants.len(), 1);
+                let variant_id = definition.variants[0].id;
+                for i in 0..num_data {
+                    let datum = definition
+                        .get_variant_datum_definition_by_name(variant_id, &format!("field_{}", i));
+                    assert!(datum.is_none());
+                }
+            }
+            {
+                for i in 0..num_data {
+                    let datum = definition
+                        .get_current_datum_definition_by_name(&format!("field_{}", i))
+                        .unwrap();
+                    assert_eq!(datum.name(), format!("field_{}", i));
+                }
+            }
+            definition.close_record_variant();
+            if num_data > 0 {
+                let variant_id = definition.variants[1].id;
+                let datum = definition
+                    .get_variant_datum_definition_by_name(variant_id, first_variant_field_name);
+                assert!(datum.is_none());
+                let datum =
+                    definition.get_current_datum_definition_by_name(first_variant_field_name);
+                assert!(datum.is_none());
+                for i in 0..num_data {
+                    let datum = definition
+                        .get_variant_datum_definition_by_name(variant_id, &format!("field_{}", i))
+                        .unwrap();
+                    assert_eq!(datum.name(), format!("field_{}", i));
+                    let datum = definition
+                        .get_current_datum_definition_by_name(&format!("field_{}", i))
+                        .unwrap();
+                    assert_eq!(datum.name(), format!("field_{}", i));
                 }
             }
         }
