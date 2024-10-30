@@ -296,3 +296,61 @@ fn generate_data_out_record(
         record.doc(doc);
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use rand::Rng;
+    use rand_chacha::rand_core::SeedableRng;
+
+    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
+
+    use super::*;
+
+    #[test]
+    fn should_align_offsets_according_to_rust_alignment_rules() {
+        let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
+        println!("Seed: {:#04x?}", rng.get_seed());
+
+        let type_resolver = HostTypeResolver;
+
+        const MAX_DATA: usize = 32;
+        for _ in 0..256 {
+            let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+            let num_data = rng.gen_range(0..=MAX_DATA);
+            let add_one = |definition: &mut RecordDefinitionBuilder<_>,
+                           rng: &mut rand_chacha::ChaCha8Rng,
+                           i: usize| match rng.gen_range(0..5) {
+                0 => {
+                    definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i));
+                }
+                1 => {
+                    definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i));
+                }
+                2 => {
+                    definition.add_datum_allow_uninit::<u32, _>(format!("field_{}", i));
+                }
+                3 => {
+                    definition.add_datum_allow_uninit::<u64, _>(format!("field_{}", i));
+                }
+                4 => {
+                    definition.add_datum::<String, _>(format!("field_{}", i));
+                }
+                i => unreachable!("Unhandled value {}", i),
+            };
+            for i in 0..num_data {
+                add_one(&mut definition, &mut rng, i);
+            }
+            definition.close_record_variant();
+            for _ in 0..(num_data / 5) {
+                let index = rng.gen_range(0..definition.data().len());
+                definition.remove_datum(definition.data()[index].id());
+            }
+            for i in 0..(num_data / 5) {
+                add_one(&mut definition, &mut rng, num_data + i);
+            }
+            let def = definition.build();
+            generate(&def, &GeneratorConfig::default());
+        }
+    }
+}

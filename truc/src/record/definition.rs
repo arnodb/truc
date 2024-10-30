@@ -517,6 +517,11 @@ where
             variants: self.variants,
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn data(&self) -> &Vec<DatumDefinition> {
+        &self.datum_definitions.data
+    }
 }
 
 impl<R> Index<DatumId> for RecordDefinitionBuilder<R>
