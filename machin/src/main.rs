@@ -15,7 +15,12 @@ fn machin() {
 
     use crate::truc::*;
 
+    #[cfg(target_pointer_width = "64")]
     assert_eq!(MAX_SIZE, 72);
+    #[cfg(target_pointer_width = "32")]
+    assert_eq!(MAX_SIZE, 36);
+    #[cfg(not(any(target_pointer_width = "64", target_pointer_width = "32")))]
+    unimplemented!();
 
     let record_4 = Record4::new(UnpackedRecord4 {
         datum_b: 0b_0010_0010_0010_0010_0010_0010_0010_0010,

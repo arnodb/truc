@@ -21,6 +21,9 @@ on:
       pre_build_script:
         required: false
         type: string
+      post_build_script:
+        required: false
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -64,4 +67,9 @@ jobs:
       - id: test
         name: Compile and run tests
         run: cargo test ${{ inputs.rust_features }} --verbose
+
+      - id: post_build_script
+        name: Post build script
+        if: ${{ inputs.post_build_script }}
+        run: ${{ inputs.post_build_script }}
 

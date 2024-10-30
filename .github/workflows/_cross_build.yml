@@ -13,6 +13,12 @@ on:
         required: false
         type: string
         default: --all-features
+      pre_build_script:
+        required: false
+        type: string
+      post_build_script:
+        required: false
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -36,6 +42,11 @@ jobs:
         with:
           toolchain: ${{ inputs.rust_toolchain }}
 
+      - id: pre_build_script
+        name: Pre build script
+        if: ${{ inputs.pre_build_script }}
+        run: ${{ inputs.pre_build_script }}
+
       - run: |
           curl -OL "https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz"
           mkdir cross
@@ -46,3 +57,9 @@ jobs:
           ./cross/cross run --target "${{ inputs.target }}" -p machin_target_types >| "target/shared_machin/${{ inputs.target }}/debug/target_types.json"
 
       - run: ./cross/cross test ${{ inputs.rust_features }} --target ${{ inputs.target }} -vv
+
+      - id: post_build_script
+        name: Post build script
+        if: ${{ inputs.post_build_script }}
+        run: ${{ inputs.post_build_script }}
+

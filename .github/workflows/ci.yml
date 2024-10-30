@@ -12,6 +12,7 @@ jobs:
     with:
       rust_toolchain: stable
       with_rustfmt: true
+      post_build_script: cargo run -p machin
 
   main_1_56_1:
     name: Rust 1.56.1
@@ -20,12 +21,14 @@ jobs:
       rust_toolchain: 1.56.1
       with_clippy: true
       pre_build_script: ./scripts/msrv_pin_dependencies.sh
+      post_build_script: cargo run -p machin
 
   main_nightly:
     name: Rust nightly
     uses: ./.github/workflows/_build.yml
     with:
       rust_toolchain: nightly
+      post_build_script: cargo run -p machin
 
   cross_stable_i686:
     name: Rust stable i686-unknown-linux-gnu
@@ -33,6 +36,7 @@ jobs:
     with:
       target: i686-unknown-linux-gnu
       rust_toolchain: stable
+      post_build_script: ./cross/cross run -p machin --target i686-unknown-linux-gnu -vv
 
   cross_stable_aarch64:
     name: Rust stable aarch64-unknown-linux-gnu
@@ -40,6 +44,7 @@ jobs:
     with:
       target: aarch64-unknown-linux-gnu
       rust_toolchain: stable
+      post_build_script: ./cross/cross run -p machin --target aarch64-unknown-linux-gnu -vv
 
   cross_1_65_0_i686:
     name: Rust 1.65.0 i686-unknown-linux-gnu
@@ -47,6 +52,7 @@ jobs:
     with:
       target: i686-unknown-linux-gnu
       rust_toolchain: 1.65.0
+      post_build_script: ./cross/cross run -p machin --target i686-unknown-linux-gnu -vv
 
   cross_1_65_0_aarch64:
     name: Rust 1.65.0 aarch64-unknown-linux-gnu
@@ -54,4 +60,5 @@ jobs:
     with:
       target: aarch64-unknown-linux-gnu
       rust_toolchain: 1.65.0
+      post_build_script: ./cross/cross run -p machin --target aarch64-unknown-linux-gnu -vv
 
