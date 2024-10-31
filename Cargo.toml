@@ -3,7 +3,8 @@ resolver = "2"
 members = [
     "truc",
     "truc_runtime",
-    "machin_data",
-    "machin_target_types",
-    "machin",
+    "examples/target_types",
+    "examples/fibonacci",
+    "examples/machin/data",
+    "examples/machin/machin",
 ]

@@ -1,0 +1,9 @@
+[package]
+name = "examples_target_types"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.56.1"
+
+[dependencies]
+machin_data = { path = "../machin/data" }
+truc = { path = "../../truc" }

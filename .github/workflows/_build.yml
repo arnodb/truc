@@ -68,8 +68,11 @@ jobs:
         name: Compile and run tests
         run: cargo test ${{ inputs.rust_features }} --verbose
 
-      - id: post_build_script
-        name: Post build script
-        if: ${{ inputs.post_build_script }}
-        run: ${{ inputs.post_build_script }}
+      - id: run-fibonacci
+        name: Run the "fibonacci" example
+        run: cargo run -p fibonacci
+
+      - id: run-machin
+        name: Run the "machin" example
+        run: cargo run -p machin
 

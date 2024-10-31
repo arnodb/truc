@@ -9,7 +9,7 @@ use truc::{
     },
 };
 
-const SHARED_DIR: &str = "shared_machin";
+const SHARED_DIR: &str = "shared_truc_examples";
 
 enum CrossCompilation {
     No,

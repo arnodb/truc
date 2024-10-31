@@ -7,13 +7,13 @@ rust-version = "1.56.1"
 [dependencies]
 assert_matches = "1"
 bincode = "1"
-machin_data = { path = "../machin_data" }
+machin_data = { path = "../data" }
 serde = "1"
 serde_json = "1"
 static_assertions = "1"
-truc_runtime = { path = "../truc_runtime" }
+truc_runtime = { path = "../../../truc_runtime" }
 
 [build-dependencies]
-machin_data = { path = "../machin_data" }
+machin_data = { path = "../data" }
 serde_json = "1"
-truc = { path = "../truc" }
+truc = { path = "../../../truc" }
