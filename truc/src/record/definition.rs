@@ -559,6 +559,33 @@ mod tests {
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
+    #[test]
+    fn should_display_definition() {
+        let type_resolver = HostTypeResolver;
+        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        let uint_32_id = definition.add_datum_allow_uninit::<u32, _>("uint_32");
+        definition.add_datum::<u16, _>("uint_16");
+        definition.close_record_variant();
+        definition.remove_datum(uint_32_id);
+        let def = definition.build();
+        assert_eq!(
+            def.to_string(),
+            concat!(
+                "0 [",
+                "0: uint_32 (u32, align 4, offset 0, size 4), ",
+                "1: uint_16 (u16, align 2, offset 4, size 2)",
+                "]\n",
+                "1 [",
+                "(void, 4), ",
+                "1: uint_16 (u16, align 2, offset 4, size 2)",
+                "]\n"
+            )
+            .to_string()
+        );
+        assert_eq!(def.variants[0].to_string(), "0 [0, 1]");
+        assert_eq!(def.variants[1].to_string(), "1 [1]");
+    }
+
     use crate::record::{
         definition::RecordDefinitionBuilder,
         type_resolver::{HostTypeResolver, TypeResolver},
@@ -690,6 +717,34 @@ mod tests {
                     assert_eq!(datum.name(), format!("field_{}", i));
                 }
             }
+        }
+    }
+
+    #[test]
+    fn should_index_data_and_variants() {
+        let type_resolver = HostTypeResolver;
+        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        let uint_32_id = definition.add_datum_allow_uninit::<u32, _>("uint_32");
+        definition.add_datum::<u16, _>("uint_16");
+        definition.close_record_variant();
+        definition.remove_datum(uint_32_id);
+
+        for datum in definition.data() {
+            assert_eq!(definition[datum.id].id, datum.id);
+        }
+
+        for variant in &definition.variants {
+            assert_eq!(definition[variant.id].id, variant.id);
+        }
+
+        let def = definition.build();
+
+        for datum in def.datum_definitions() {
+            assert_eq!(def[datum.id].id, datum.id);
+        }
+
+        for variant in def.variants() {
+            assert_eq!(def[variant.id].id, variant.id);
         }
     }
 }
