@@ -99,6 +99,7 @@ where
             unsafe { std::mem::transmute(ManuallyDrop::into_inner(manually_drop)) }
         }
         Err(err) => {
+            dbg!(first_moved);
             // Bring Us back into auto-drop land
             for element in &slice[0..first_moved] {
                 let mut uuu = MaybeUninit::<U>::uninit();
@@ -171,10 +172,64 @@ mod tests {
 
         assert_eq!(output.len(), 8);
 
+        // All 1s are dropped
         assert_eq!(dropped1.load(Ordering::Relaxed), 32);
 
         drop(output);
 
+        // All 8 converted 2s are dropped
         assert_eq!(dropped2.load(Ordering::Relaxed), 8);
+    }
+
+    #[test]
+    fn test_drops_on_panic() {
+        use std::sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        };
+
+        struct CountDrop {
+            value: usize,
+            dropped: Arc<AtomicUsize>,
+        }
+
+        impl Drop for CountDrop {
+            fn drop(&mut self) {
+                self.dropped.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        let dropped1 = Arc::new(AtomicUsize::new(0));
+        let dropped2 = Arc::new(AtomicUsize::new(0));
+
+        let mut input = Vec::new();
+        for value in 0..32 {
+            input.push(CountDrop {
+                value,
+                dropped: dropped1.clone(),
+            });
+        }
+
+        let panic = std::panic::catch_unwind(|| {
+            convert_vec_in_place::<CountDrop, CountDrop, _>(input, |rec, _| {
+                if rec.value == 23 {
+                    panic!("boom");
+                } else if rec.value % 4 == 0 {
+                    VecElementConversionResult::Converted(CountDrop {
+                        value: rec.value,
+                        dropped: dropped2.clone(),
+                    })
+                } else {
+                    VecElementConversionResult::Abandonned
+                }
+            })
+        });
+        assert!(panic.is_err());
+
+        // All 1s are dropped
+        assert_eq!(dropped1.load(Ordering::Relaxed), 32);
+
+        // All 6 (only) converted 2s are dropped
+        assert_eq!(dropped2.load(Ordering::Relaxed), 6);
     }
 }

@@ -70,6 +70,34 @@ mod tests {
     }
 
     #[test]
+    fn test_record_getters() {
+        const CAP: usize = std::mem::size_of::<u32>() * 2;
+
+        let mut record = RecordMaybeUninit::<CAP>::default();
+        for (i1, i2) in [
+            (0x2cfed605, 0xa93696d0),
+            (0xf62c11c5, 0xca28ccda),
+            (0x6844c3a7, 0x1979719d),
+            (0xfad56b4e, 0x43f160da),
+            (0xf287ec76, 0x30850690),
+            (0x00be3837, 0x55b6dd5b),
+            (0xa2a359c2, 0x11a32b39),
+            (0xd555b28d, 0xeb2dde75),
+        ] {
+            unsafe {
+                *record.get_mut::<u32>(0) = i1;
+                *record.get_mut::<u32>(4) = i2;
+                assert_eq!(*record.get::<u32>(0), i1);
+                assert_eq!(*record.get::<u32>(4), i2);
+                *record.get_mut::<u32>(0) = i2;
+                *record.get_mut::<u32>(4) = i1;
+                assert_eq!(*record.get::<u32>(0), i2);
+                assert_eq!(*record.get::<u32>(4), i1);
+            }
+        }
+    }
+
+    #[test]
     fn test_record_write_read_drop() {
         static mut COUNTER: usize = 0;
 
