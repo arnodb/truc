@@ -303,6 +303,7 @@ mod tests {
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
+    use crate::generator::fragment::serde::SerdeImplGenerator;
     use crate::record::{
         definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
         type_resolver::{StaticTypeResolver, TypeResolver},
@@ -380,7 +381,12 @@ mod tests {
                 add_one(&mut definition, &mut rng, num_data + i);
             }
             let def = definition.build();
-            generate(&def, &GeneratorConfig::default());
+            generate(
+                &def,
+                &GeneratorConfig {
+                    custom_fragment_generators: vec![Box::new(SerdeImplGenerator)],
+                },
+            );
         }
     }
 }
