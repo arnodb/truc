@@ -1,10 +1,12 @@
 use std::mem::MaybeUninit;
 
+/// Internal data holder, heavily unsage, do not use it directly.
 pub struct RecordMaybeUninit<const CAP: usize> {
     data: [MaybeUninit<u8>; CAP],
 }
 
 impl<const CAP: usize> RecordMaybeUninit<CAP> {
+    /// Constructs an uninitialized record.
     pub fn new() -> Self {
         Self {
             data: unsafe { std::mem::MaybeUninit::uninit().assume_init() },

@@ -246,6 +246,11 @@ pub struct DatumDefinitionOverride {
     pub allow_uninit: Option<bool>,
 }
 
+/// Main structure to start building record definitions.
+///
+/// It needs a type resolver (see
+/// [type_resolver](crate::record::type_resolver) module and especially
+/// [HostTypeResolver](crate::record::type_resolver::HostTypeResolver)).
 pub struct RecordDefinitionBuilder<R>
 where
     R: TypeResolver,
@@ -261,6 +266,9 @@ impl<R> RecordDefinitionBuilder<R>
 where
     R: TypeResolver,
 {
+    /// Creates a new builder with a type resolver (see
+    /// [type_resolver](crate::record::type_resolver) module and especially
+    /// [HostTypeResolver](crate::record::type_resolver::HostTypeResolver)).
     pub fn new(type_resolver: R) -> Self {
         Self {
             datum_definitions: DatumDefinitionCollection::default(),
@@ -271,6 +279,10 @@ where
         }
     }
 
+    /// Adds a new datum of type `T` to the current variant.
+    ///
+    /// `T` does not need to be `Copy`, but if it is then consider using
+    /// [add_datum_allow_uninit](Self::add_datum_allow_uninit) instead.
     pub fn add_datum<T, N>(&mut self, name: N) -> DatumId
     where
         N: Into<String>,
@@ -285,6 +297,10 @@ where
         datum_id
     }
 
+    /// Adds a new datum of type `T: Copy` to the current variant.
+    ///
+    /// `T` needs to be `Copy` to allow uninitialized values, if it is not `Copy` then consider
+    /// using [add_datum](Self::add_datum) instead.
     pub fn add_datum_allow_uninit<T, N>(&mut self, name: N) -> DatumId
     where
         T: Copy,
@@ -300,6 +316,25 @@ where
         datum_id
     }
 
+    /// Adds a new datum to the current variant when type information of `T` needs to be overridden.
+    ///
+    /// For example if you want to add a datum of type `Vec<MyStruct>` then call it like this:
+    ///
+    /// ```no_compile
+    /// add_datum_override::<Vec<()>, _>(
+    ///     "my_vec",
+    ///     DatumDefinitionOverride {
+    ///         // Real type name
+    ///         type_name: Some("Vec<MyStruct>".to_owned()),
+    ///         // Same size
+    ///         size: None,
+    ///         // Same alignment rule
+    ///         align: None,
+    ///         // Same allow_uninit flag
+    ///         allow_uninit: None,
+    ///     },
+    /// )
+    /// ```
     pub fn add_datum_override<T, N>(
         &mut self,
         name: N,
@@ -330,6 +365,7 @@ where
         datum_id
     }
 
+    /// Adds a new datum of dynamic type to the current variant.
     pub fn add_dynamic_datum<T, N>(&mut self, name: N, r#type: T) -> DatumId
     where
         T: AsRef<str>,
@@ -346,6 +382,7 @@ where
         datum_id
     }
 
+    /// Adds a new datum by copying an existing definition.
     pub fn copy_datum(&mut self, datum: &DatumDefinition) -> DatumId {
         let datum_id = self.datum_definitions.push(
             datum.name().into(),
@@ -357,6 +394,9 @@ where
         datum_id
     }
 
+    /// Remove a datum from the current variant.
+    ///
+    /// It panics if the operation cannot be performed or is already performed.
     pub fn remove_datum(&mut self, datum_id: DatumId) {
         if let Some(variant) = self.variants.last() {
             let index = variant.data.iter().position(|&did| did == datum_id);
@@ -394,6 +434,7 @@ where
         self.variants.is_empty() || !self.data_to_remove.is_empty() || !self.data_to_add.is_empty()
     }
 
+    /// Closes the current record variant and allows starting a new one.
     pub fn close_record_variant(&mut self) -> RecordVariantId {
         if !self.has_pending_changes() {
             return (self.variants.len() - 1).into();
@@ -464,14 +505,17 @@ where
         variant_id
     }
 
+    /// Accesses datum definitions by ID.
     pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition> {
         self.datum_definitions.get(id)
     }
 
+    /// Accesses variant definitions by ID.
     pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
         self.variants.get(id.0)
     }
 
+    /// Accesses datum definitions by variant ID and datum name.
     pub fn get_variant_datum_definition_by_name(
         &self,
         variant_id: RecordVariantId,
@@ -506,12 +550,14 @@ where
             .chain(self.data_to_add.iter().cloned())
     }
 
+    /// Accesses datum definitions of the current variant by datum name.
     pub fn get_current_datum_definition_by_name(&self, name: &str) -> Option<&DatumDefinition> {
         self.get_current_data()
             .filter_map(|d| self.datum_definitions.get(d))
             .find(|datum| datum.name() == name)
     }
 
+    /// Wraps up everything into a [RecordDefinition].
     pub fn build(mut self) -> RecordDefinition {
         if !self.data_to_add.is_empty() || !self.data_to_remove.is_empty() {
             self.close_record_variant();

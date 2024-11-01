@@ -3,11 +3,22 @@ use std::{
     mem::{ManuallyDrop, MaybeUninit},
 };
 
+/// The result of a record conversion in a call to [convert_vec_in_place].
 pub enum VecElementConversionResult<T> {
+    /// The record has been converted to the attached value.
     Converted(T),
+    /// The record has been abandonned.
     Abandonned,
 }
 
+/// Converts a vector of `T` to a vector of `U` where `T` and `U` have the same size in memory and
+/// the same alignment rule according to the Rust compiler.
+///
+/// If the provided converter panics then your memory is safe: no invalid access is performed,
+/// values that need to be dropped are dropped.
+///
+/// Note: the 2 required conditions are checked at runtime. However it is reasonably expected that
+/// those runtime checks are optimized statically by the compiler: NOOP or pure panic.
 pub fn convert_vec_in_place<T, U, C>(input: Vec<T>, convert: C) -> Vec<U>
 where
     C: Fn(T, Option<&mut U>) -> VecElementConversionResult<U> + std::panic::RefUnwindSafe,
@@ -16,9 +27,8 @@ where
     // invariant but this would have two drawbacks:
     //
     // - you have to trust the implementations of the trait
-    // - this would prevent from allowing
-    // conversions from any type T to any other type U where they both have the same memory
-    // layout
+    // - this would prevent from allowing conversions from any type T to any other type U where
+    // they both have the same memory layout
     //
     // Side note: those runtime assertions are optimised statically: either code without
     // assertion code (the happy path), or pure panic (the incorrect path).

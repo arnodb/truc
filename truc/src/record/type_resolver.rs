@@ -4,22 +4,33 @@ use serde::{Deserialize, Serialize};
 
 use crate::record::type_name::{truc_dynamic_type_name, truc_type_name};
 
+/// Type information (name, size and align) as given by the Rust compiler.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct TypeInfo {
+    /// The type name as it can be used in Rust code.
     pub name: String,
+    /// The type size given by `std::mem::size_of()`.
     pub size: usize,
+    /// The type size given by `std::mem::align_of()`.
     pub align: usize,
 }
 
+/// Additional type information.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DynamicTypeInfo {
+    /// Rust type information.
     pub info: TypeInfo,
+    /// Indicates whether or not the type can be left safely uninitialized. Merely `Copy` types
+    /// can be left uninitialized, any other type cannot.
     pub allow_uninit: bool,
 }
 
+/// Abstract type resolver trait.
 pub trait TypeResolver {
+    /// Gives the Rust type information for `T`.
     fn type_info<T>(&self) -> TypeInfo;
 
+    /// Gives the dynamic type information `type_name`.
     fn dynamic_type_info(&self, type_name: &str) -> DynamicTypeInfo;
 }
 
@@ -36,9 +47,12 @@ where
     }
 }
 
+/// A type resolver that can give Rust type information only. Any call to
+/// [dynamic_type_info](HostTypeResolver::dynamic_type_info) will panic.
 pub struct HostTypeResolver;
 
 impl TypeResolver for HostTypeResolver {
+    /// Resolves the Rust type information by calling `std::mem::size_of()` and `std::mem::align_of()`.
     fn type_info<T>(&self) -> TypeInfo {
         TypeInfo {
             name: truc_type_name::<T>(),
@@ -47,23 +61,34 @@ impl TypeResolver for HostTypeResolver {
         }
     }
 
+    /// Panics!
     fn dynamic_type_info(&self, _type_name: &str) -> DynamicTypeInfo {
         unimplemented!("HostTypeResolver cannot resolve dynamic types")
     }
 }
 
+/// A type resolved that loads precomputed type information.
+///
+/// In addition to allowing a good level of customization, it is also very useful for
+/// cross-compilation:
+///
+/// * compute data by running the resolution on the target platform
+/// * serialize the data with `serde` to a file
+/// * deserialize the file in the project to be cross-compiled
 #[derive(Debug, From, Serialize, Deserialize)]
 pub struct StaticTypeResolver {
     types: BTreeMap<String, DynamicTypeInfo>,
 }
 
 impl StaticTypeResolver {
+    /// Creates an empty resolver.
     pub fn new() -> Self {
         Self {
             types: BTreeMap::new(),
         }
     }
 
+    /// Adds a single type information to the data.
     pub fn add_type<T>(&mut self) {
         let type_name = truc_type_name::<T>();
         match self.types.entry(type_name.clone()) {
@@ -87,6 +112,7 @@ impl StaticTypeResolver {
         }
     }
 
+    /// Adds a single `Copy` type information to the data.
     pub fn add_type_allow_uninit<T>(&mut self)
     where
         T: Copy,
@@ -113,6 +139,14 @@ impl StaticTypeResolver {
         }
     }
 
+    /// Adds standard types to the data.
+    ///
+    /// It includes:
+    ///
+    /// * various types of integers and floating point numbers
+    /// * `String`
+    /// * `Box<str>`
+    /// * `Vec<()>` which is enough to support any kind of vector
     pub fn add_std_types(&mut self) {
         macro_rules! add_type {
             ($type:ty) => {
@@ -179,26 +213,31 @@ impl StaticTypeResolver {
         add_type_and_arrays!(Vec<()>);
     }
 
+    /// Serialization to a `serde_json::Value`.
     pub fn to_json_value(&self) -> Result<serde_json::Value, serde_json::Error> {
         serde_json::to_value(&self.types)
     }
 
+    /// Serialization to a `String`.
     pub fn to_json_string(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(&self.types)
     }
 
+    /// Serialization to a `String` with pretty printing.
     pub fn to_json_string_pretty(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(&self.types)
     }
 }
 
 impl Default for StaticTypeResolver {
+    /// Creates an empty resolver.
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl TypeResolver for StaticTypeResolver {
+    /// Gives the Rust type information for `T` by looking up loaded data.
     fn type_info<T>(&self) -> TypeInfo {
         let type_name = truc_type_name::<T>();
         self.types
@@ -208,6 +247,7 @@ impl TypeResolver for StaticTypeResolver {
             .clone()
     }
 
+    /// Gives the dynamic type information  for `type_name` by looking up data.
     fn dynamic_type_info(&self, type_name: &str) -> DynamicTypeInfo {
         let type_name = truc_dynamic_type_name(type_name);
         self.types
