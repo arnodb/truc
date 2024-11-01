@@ -1,6 +1,6 @@
 [package]
 name = "truc_runtime"
-version = "0.2.0-dev"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.56.1"
 license-file = "../LICENSE"
