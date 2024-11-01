@@ -303,13 +303,14 @@ mod tests {
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
-    use crate::generator::fragment::serde::SerdeImplGenerator;
-    use crate::record::{
-        definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
-        type_resolver::{StaticTypeResolver, TypeResolver},
-    };
-
     use super::*;
+    use crate::{
+        generator::fragment::serde::SerdeImplGenerator,
+        record::{
+            definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
+            type_resolver::{StaticTypeResolver, TypeResolver},
+        },
+    };
 
     fn add_one<R: TypeResolver>(
         definition: &mut RecordDefinitionBuilder<R>,

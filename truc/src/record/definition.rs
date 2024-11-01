@@ -429,15 +429,13 @@ where
                     data_caret += 1;
                     byte_caret += caret_datum.size();
                 } else {
-                    {
-                        let bc = align_bytes(byte_caret, datum.type_align());
-                        if bc + datum.size() < caret_datum.offset {
-                            byte_caret = bc;
-                            break;
-                        } else {
-                            data_caret += 1;
-                            byte_caret = caret_datum.offset + caret_datum.size();
-                        }
+                    let bc = align_bytes(byte_caret, datum.type_align());
+                    if bc + datum.size() <= caret_datum.offset {
+                        byte_caret = bc;
+                        break;
+                    } else {
+                        data_caret += 1;
+                        byte_caret = caret_datum.offset + caret_datum.size();
                     }
                 }
             }

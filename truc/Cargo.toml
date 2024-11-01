@@ -24,6 +24,7 @@ truc_runtime = { version = "0.1.2-dev", path = "../truc_runtime" }
 
 [dev-dependencies]
 assert_matches = "1"
+pretty_assertions = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 

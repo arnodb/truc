@@ -1,5 +1,6 @@
-use maplit::btreemap;
 use std::{collections::BTreeMap, prelude::v1::*};
+
+use maplit::btreemap;
 use syn::{
     visit_mut::{visit_type_path_mut, VisitMut},
     Path, PathSegment, Type, TypePath,
