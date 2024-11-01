@@ -1,0 +1,11 @@
+[package]
+name = "readme"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+static_assertions = "1"
+truc_runtime = { path = "../../truc_runtime" }
+
+[build-dependencies]
+truc = { path = "../../truc" }

@@ -8,3 +8,6 @@ members = [
     "examples/machin/data",
     "examples/machin/machin",
 ]
+exclude = [
+    "examples/readme"
+]
