@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::record::type_name::{truc_dynamic_type_name, truc_type_name};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct TypeInfo {
     pub name: String,
     pub size: usize,

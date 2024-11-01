@@ -2,7 +2,11 @@ use std::{collections::BTreeMap, env, fs::File, io::Write, path::PathBuf};
 
 use machin_data::MachinEnum;
 use truc::{
-    generator::{config::GeneratorConfig, fragment::serde::SerdeImplGenerator, generate},
+    generator::{
+        config::GeneratorConfig,
+        fragment::{serde::SerdeImplGenerator, FragmentGenerator},
+        generate,
+    },
     record::{
         definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
         type_resolver::{DynamicTypeInfo, StaticTypeResolver},
@@ -216,9 +220,9 @@ fn serialize_deserialize() {
         "{}",
         generate(
             &definition,
-            &GeneratorConfig {
-                custom_fragment_generators: vec![Box::new(SerdeImplGenerator)]
-            }
+            &GeneratorConfig::default_with_custom_generators([
+                Box::new(SerdeImplGenerator) as Box<dyn FragmentGenerator>
+            ])
         )
     )
     .unwrap();

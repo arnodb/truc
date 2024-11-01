@@ -51,3 +51,174 @@ impl FragmentGenerator for FromUnpackedRecordImplsGenerator {
         );
     }
 }
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use maplit::btreeset;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::{
+        generator::{config::GeneratorConfig, generate_variant, tests::assert_fragment_eq},
+        record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver},
+    };
+
+    #[test]
+    fn should_generate_empty_impls() {
+        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
+        builder.close_record_variant();
+        let definition = builder.build();
+
+        let config = GeneratorConfig::new([
+            Box::new(FromUnpackedRecordImplsGenerator) as Box<dyn FragmentGenerator>
+        ]);
+
+        let mut scope = Scope::new();
+        let mut type_size_assertions = BTreeSet::new();
+
+        generate_variant(
+            &definition,
+            definition.max_type_align(),
+            definition.variants().next().expect("variant"),
+            None,
+            &config,
+            &mut scope,
+            &mut type_size_assertions,
+        );
+
+        assert_fragment_eq(
+            r#"
+impl<const CAP: usize> From<UnpackedRecord0> for CappedRecord0<CAP> {
+    fn from(from: UnpackedRecord0) -> Self {
+        Self::new(from)
+    }
+}
+
+impl<const CAP: usize> From<UnpackedUninitRecord0> for CappedRecord0<CAP> {
+    fn from(from: UnpackedUninitRecord0) -> Self {
+        Self::new_uninit(from)
+    }
+}
+"#,
+            &scope.to_string(),
+        );
+
+        assert_eq!(btreeset![], type_size_assertions);
+    }
+
+    #[test]
+    fn should_generate_impls_with_data() {
+        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
+        builder.add_datum_allow_uninit::<u32, _>("integer");
+        builder.add_datum::<u32, _>("not_copy_integer");
+        builder.close_record_variant();
+        let definition = builder.build();
+
+        let config = GeneratorConfig::new([
+            Box::new(FromUnpackedRecordImplsGenerator) as Box<dyn FragmentGenerator>
+        ]);
+
+        let mut scope = Scope::new();
+        let mut type_size_assertions = BTreeSet::new();
+
+        generate_variant(
+            &definition,
+            definition.max_type_align(),
+            definition.variants().next().expect("variant"),
+            None,
+            &config,
+            &mut scope,
+            &mut type_size_assertions,
+        );
+
+        assert_fragment_eq(
+            r#"
+impl<const CAP: usize> From<UnpackedRecord0> for CappedRecord0<CAP> {
+    fn from(from: UnpackedRecord0) -> Self {
+        Self::new(from)
+    }
+}
+
+impl<const CAP: usize> From<UnpackedUninitRecord0> for CappedRecord0<CAP> {
+    fn from(from: UnpackedUninitRecord0) -> Self {
+        Self::new_uninit(from)
+    }
+}
+"#,
+            &scope.to_string(),
+        );
+
+        assert_eq!(
+            btreeset![("u32", std::mem::size_of::<u32>())],
+            type_size_assertions
+        );
+    }
+
+    #[test]
+    fn should_generate_next_impls_with_data() {
+        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
+        let i0 = builder.add_datum_allow_uninit::<u32, _>("integer0");
+        let nci0 = builder.add_datum::<u32, _>("not_copy_integer0");
+        builder.add_datum_allow_uninit::<bool, _>("boolean1");
+        builder.close_record_variant();
+        builder.remove_datum(i0);
+        builder.remove_datum(nci0);
+        builder.add_datum_allow_uninit::<u32, _>("integer1");
+        builder.add_datum::<u32, _>("not_copy_integer1");
+        builder.close_record_variant();
+        let definition = builder.build();
+
+        let config = GeneratorConfig::new([
+            Box::new(FromUnpackedRecordImplsGenerator) as Box<dyn FragmentGenerator>
+        ]);
+
+        let mut scope = Scope::new();
+        let mut type_size_assertions = BTreeSet::new();
+
+        let record0_spec = generate_variant(
+            &definition,
+            definition.max_type_align(),
+            definition.variants().next().expect("variant"),
+            None,
+            &config,
+            &mut scope,
+            &mut type_size_assertions,
+        );
+        let mut scope = Scope::new();
+        type_size_assertions.clear();
+        generate_variant(
+            &definition,
+            definition.max_type_align(),
+            definition.variants().nth(1).expect("variant"),
+            Some(&record0_spec),
+            &config,
+            &mut scope,
+            &mut type_size_assertions,
+        );
+
+        assert_fragment_eq(
+            r#"
+impl<const CAP: usize> From<UnpackedRecord1> for CappedRecord1<CAP> {
+    fn from(from: UnpackedRecord1) -> Self {
+        Self::new(from)
+    }
+}
+
+impl<const CAP: usize> From<UnpackedUninitRecord1> for CappedRecord1<CAP> {
+    fn from(from: UnpackedUninitRecord1) -> Self {
+        Self::new_uninit(from)
+    }
+}
+"#,
+            &scope.to_string(),
+        );
+
+        assert_eq!(
+            btreeset![("u32", std::mem::size_of::<u32>())],
+            type_size_assertions
+        );
+    }
+}

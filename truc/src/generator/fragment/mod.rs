@@ -23,7 +23,7 @@ pub struct FragmentGeneratorSpecs<'a> {
     pub prev_record: Option<&'a RecordSpec<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub struct RecordSpec<'a> {
     pub max_type_align: usize,
     pub variant: &'a RecordVariant,

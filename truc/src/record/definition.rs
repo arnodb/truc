@@ -14,7 +14,7 @@ impl Debug for DatumId {
     }
 }
 
-#[derive(Debug, new)]
+#[derive(PartialEq, Eq, Debug, new)]
 pub struct DatumDefinition {
     id: DatumId,
     name: String,
@@ -108,7 +108,7 @@ impl DatumDefinitionCollection {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct RecordVariantId(usize);
 
-#[derive(Debug)]
+#[derive(PartialEq, Eq, Debug, new)]
 pub struct RecordVariant {
     id: RecordVariantId,
     data: Vec<DatumId>,

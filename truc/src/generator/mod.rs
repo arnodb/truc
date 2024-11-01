@@ -5,16 +5,9 @@ use itertools::{Either, EitherOrBoth, Itertools};
 
 use self::{
     config::GeneratorConfig,
-    fragment::{
-        data_records::DataRecordsGenerator, drop_impl::DropImplGenerator,
-        from_previous_record_data_records::FromPreviousRecordDataRecordsGenerator,
-        from_previous_record_impls::FromPreviousRecordImplsGenerator,
-        from_unpacked_record_impls::FromUnpackedRecordImplsGenerator, record::RecordGenerator,
-        record_impl::RecordImplGenerator, FragmentGenerator, FragmentGeneratorSpecs, RecordGeneric,
-        RecordSpec,
-    },
+    fragment::{FragmentGeneratorSpecs, RecordGeneric, RecordSpec},
 };
-use crate::record::definition::{DatumDefinition, RecordDefinition};
+use crate::record::definition::{DatumDefinition, RecordDefinition, RecordVariant};
 
 pub mod config;
 pub mod fragment;
@@ -26,10 +19,6 @@ pub fn generate(definition: &RecordDefinition, config: &GeneratorConfig) -> Stri
     let mut scope = Scope::new();
 
     scope.import("truc_runtime::data", "RecordMaybeUninit");
-
-    for customizer in &config.custom_fragment_generators {
-        customizer.imports(&mut scope);
-    }
 
     let mut uninit_type = Type::new("RecordMaybeUninit");
     uninit_type.generic(CAP);
@@ -66,75 +55,15 @@ This is to be used in custom allocators."#,
     let mut type_size_assertions = BTreeSet::new();
 
     for variant in definition.variants() {
-        let data = variant
-            .data()
-            .sorted()
-            .map(|d| &definition[d])
-            .collect::<Vec<_>>();
-        let (minus_data, plus_data) = if let Some(prev_record_spec) = &prev_record_spec {
-            prev_record_spec
-                .variant
-                .data()
-                .sorted()
-                .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
-                .filter_map(|either| match either {
-                    EitherOrBoth::Left(left_id) => Some(Either::Left(&definition[left_id])),
-                    EitherOrBoth::Right(right) => Some(Either::Right(right)),
-                    EitherOrBoth::Both(_, _) => None,
-                })
-                .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e)
-        } else {
-            (Vec::new(), data.clone())
-        };
-        let unpacked_uninit_safe_generic = safe_record_generic(&data);
-        let plus_uninit_safe_generic = safe_record_generic(&plus_data);
-        let record_spec = RecordSpec {
+        let record_spec = generate_variant(
+            definition,
             max_type_align,
             variant,
-            capped_record_name: format!("CappedRecord{}", variant.id()),
-            record_name: format!("Record{}", variant.id()),
-            unpacked_record_name: format!("UnpackedRecord{}", variant.id()),
-            unpacked_uninit_record_name: format!("UnpackedUninitRecord{}", variant.id()),
-            unpacked_uninit_safe_record_name: format!("UnpackedUninitSafeRecord{}", variant.id()),
-            unpacked_record_in_name: format!("UnpackedRecordIn{}", variant.id()),
-            unpacked_uninit_record_in_name: format!("UnpackedUninitRecordIn{}", variant.id()),
-            unpacked_uninit_safe_record_in_name: format!(
-                "UnpackedUninitSafeRecordIn{}",
-                variant.id()
-            ),
-            record_and_unpacked_out_name: format!("Record{}AndUnpackedOut", variant.id()),
-            data,
-            minus_data,
-            plus_data,
-            unpacked_uninit_safe_generic,
-            plus_uninit_safe_generic,
-        };
-
-        for datum in &record_spec.plus_data {
-            type_size_assertions.insert((datum.type_name(), datum.size()));
-        }
-
-        let specs = FragmentGeneratorSpecs {
-            record: &record_spec,
-            prev_record: prev_record_spec.as_ref(),
-        };
-
-        let common_fragment_generators: [Box<dyn FragmentGenerator>; 7] = [
-            Box::new(DataRecordsGenerator),
-            Box::new(RecordGenerator),
-            Box::new(RecordImplGenerator),
-            Box::new(DropImplGenerator),
-            Box::new(FromUnpackedRecordImplsGenerator),
-            Box::new(FromPreviousRecordDataRecordsGenerator),
-            Box::new(FromPreviousRecordImplsGenerator),
-        ];
-        let fragment_generators = common_fragment_generators
-            .iter()
-            .chain(config.custom_fragment_generators.iter());
-
-        for generator in fragment_generators {
-            generator.generate(&specs, &mut scope);
-        }
+            prev_record_spec.as_ref(),
+            config,
+            &mut scope,
+            &mut type_size_assertions,
+        );
 
         prev_record_spec = Some(record_spec);
     }
@@ -149,6 +78,75 @@ This is to be used in custom allocators."#,
     }
 
     scope.to_string()
+}
+
+pub(crate) fn generate_variant<'a>(
+    definition: &'a RecordDefinition,
+    max_type_align: usize,
+    variant: &'a RecordVariant,
+    prev_record_spec: Option<&RecordSpec>,
+    config: &GeneratorConfig,
+    scope: &mut Scope,
+    type_size_assertions: &mut BTreeSet<(&'a str, usize)>,
+) -> RecordSpec<'a> {
+    let data = variant
+        .data()
+        .sorted()
+        .map(|d| &definition[d])
+        .collect::<Vec<_>>();
+    let (minus_data, plus_data) = if let Some(prev_record_spec) = &prev_record_spec {
+        prev_record_spec
+            .variant
+            .data()
+            .sorted()
+            .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
+            .filter_map(|either| match either {
+                EitherOrBoth::Left(left_id) => Some(Either::Left(&definition[left_id])),
+                EitherOrBoth::Right(right) => Some(Either::Right(right)),
+                EitherOrBoth::Both(_, _) => None,
+            })
+            .partition_map::<Vec<_>, Vec<_>, _, _, _>(|e| e)
+    } else {
+        (Vec::new(), data.clone())
+    };
+    let unpacked_uninit_safe_generic = safe_record_generic(&data);
+    let plus_uninit_safe_generic = safe_record_generic(&plus_data);
+    let record_spec = RecordSpec {
+        max_type_align,
+        variant,
+        capped_record_name: format!("CappedRecord{}", variant.id()),
+        record_name: format!("Record{}", variant.id()),
+        unpacked_record_name: format!("UnpackedRecord{}", variant.id()),
+        unpacked_uninit_record_name: format!("UnpackedUninitRecord{}", variant.id()),
+        unpacked_uninit_safe_record_name: format!("UnpackedUninitSafeRecord{}", variant.id()),
+        unpacked_record_in_name: format!("UnpackedRecordIn{}", variant.id()),
+        unpacked_uninit_record_in_name: format!("UnpackedUninitRecordIn{}", variant.id()),
+        unpacked_uninit_safe_record_in_name: format!("UnpackedUninitSafeRecordIn{}", variant.id()),
+        record_and_unpacked_out_name: format!("Record{}AndUnpackedOut", variant.id()),
+        data,
+        minus_data,
+        plus_data,
+        unpacked_uninit_safe_generic,
+        plus_uninit_safe_generic,
+    };
+
+    for datum in &record_spec.plus_data {
+        type_size_assertions.insert((datum.type_name(), datum.size()));
+    }
+
+    let specs = FragmentGeneratorSpecs {
+        record: &record_spec,
+        prev_record: prev_record_spec,
+    };
+
+    let fragment_generators = config.fragment_generators.iter();
+
+    for generator in fragment_generators {
+        generator.imports(scope);
+        generator.generate(&specs, scope);
+    }
+
+    record_spec
 }
 
 struct RecordImplRecordNames<'a> {
@@ -300,8 +298,11 @@ fn generate_data_out_record(
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
+    use fragment::FragmentGenerator;
+    use pretty_assertions::assert_eq;
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
+    use syn::File;
 
     use super::*;
     use crate::{
@@ -311,6 +312,14 @@ mod tests {
             type_resolver::{StaticTypeResolver, TypeResolver},
         },
     };
+
+    pub(crate) fn assert_fragment_eq(left: &str, right: &str) {
+        let parsed_left = syn::parse_str::<File>(left).expect("left");
+        let parsed_right = syn::parse_str::<File>(right).expect("right");
+        if parsed_left != parsed_right {
+            assert_eq!(left, right);
+        }
+    }
 
     fn add_one<R: TypeResolver>(
         definition: &mut RecordDefinitionBuilder<R>,
@@ -384,9 +393,9 @@ mod tests {
             let def = definition.build();
             generate(
                 &def,
-                &GeneratorConfig {
-                    custom_fragment_generators: vec![Box::new(SerdeImplGenerator)],
-                },
+                &GeneratorConfig::default_with_custom_generators([
+                    Box::new(SerdeImplGenerator) as Box<dyn FragmentGenerator>
+                ]),
             );
         }
     }
