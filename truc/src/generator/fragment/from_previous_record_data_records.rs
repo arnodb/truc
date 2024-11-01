@@ -224,7 +224,7 @@ impl<T0: Copy> From<UnpackedUninitRecordIn1> for UnpackedUninitSafeRecordIn1<T0>
 }
 
 /// Result of conversion from record variant #0 to variant #1 via a [`From::from`] call.
-/// 
+///
 /// It contains all the removed data so that one can still use them, or drop them.
 pub struct Record1AndUnpackedOut<const CAP: usize> {
     pub record: CappedRecord1<CAP>,

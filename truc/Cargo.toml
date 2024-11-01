@@ -10,16 +10,16 @@ repository = "https://github.com/arnodb/truc"
 readme = "../README.md"
 
 [dependencies]
-codegen = "0.1"
+codegen = "0.2"
 derive_more = "0.99"
-derive-new = "0.5"
-itertools = "0.10"
+derive-new = "0.7"
+itertools = "0.13"
 maplit = "1"
 proc-macro2 = "1"
 quote = "1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-syn = { version = "1", features = ["full", "extra-traits", "visit-mut"] }
+syn = { version = "2", features = ["full", "extra-traits", "visit-mut"] }
 truc_runtime = { version = "0.2.0-dev", path = "../truc_runtime" }
 
 [dev-dependencies]

@@ -94,13 +94,13 @@ mod tests {
         assert_fragment_eq(
             r#"
 /// Data container for packing/unpacking records.
-/// 
+///
 /// All the fields are named for the safe interoperability between the generated code and the code
 /// using it.
 pub struct UnpackedRecord0;
 
 /// Data container for packing/unpacking records without the data to be left uninitialized.
-/// 
+///
 /// All the fields are named for the safe interoperability between the generated code and the code
 /// using it.
 pub struct UnpackedUninitRecord0;
@@ -147,7 +147,7 @@ impl From<UnpackedUninitRecord0> for UnpackedUninitSafeRecord0 {
         assert_fragment_eq(
             r#"
 /// Data container for packing/unpacking records.
-/// 
+///
 /// All the fields are named for the safe interoperability between the generated code and the code
 /// using it.
 pub struct UnpackedRecord0 {
@@ -156,7 +156,7 @@ pub struct UnpackedRecord0 {
 }
 
 /// Data container for packing/unpacking records without the data to be left uninitialized.
-/// 
+///
 /// All the fields are named for the safe interoperability between the generated code and the code
 /// using it.
 pub struct UnpackedUninitRecord0 {
@@ -228,7 +228,7 @@ impl<T0: Copy> From<UnpackedUninitRecord0> for UnpackedUninitSafeRecord0<T0> {
         assert_fragment_eq(
             r#"
 /// Data container for packing/unpacking records.
-/// 
+///
 /// All the fields are named for the safe interoperability between the generated code and the code
 /// using it.
 pub struct UnpackedRecord1 {
@@ -238,7 +238,7 @@ pub struct UnpackedRecord1 {
 }
 
 /// Data container for packing/unpacking records without the data to be left uninitialized.
-/// 
+///
 /// All the fields are named for the safe interoperability between the generated code and the code
 /// using it.
 pub struct UnpackedUninitRecord1 {

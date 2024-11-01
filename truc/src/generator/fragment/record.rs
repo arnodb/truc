@@ -93,7 +93,7 @@ mod tests {
 use truc_runtime::data::RecordMaybeUninit;
 
 /// Record variant #0.
-/// 
+///
 /// It may be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)
 #[repr(align(1))]
 pub struct CappedRecord0<const CAP: usize> {
@@ -138,7 +138,7 @@ pub type Record0 = CappedRecord0<{ MAX_SIZE }>;
 use truc_runtime::data::RecordMaybeUninit;
 
 /// Record variant #0.
-/// 
+///
 /// It may be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)
 #[repr(align(4))]
 pub struct CappedRecord0<const CAP: usize> {
@@ -203,9 +203,9 @@ pub type Record0 = CappedRecord0<{ MAX_SIZE }>;
 use truc_runtime::data::RecordMaybeUninit;
 
 /// Record variant #1.
-/// 
+///
 /// It may be converted from a [`Record0`] via one of the various call to [`From::from`]
-/// 
+///
 /// It may also be created from initial data via one of [`new`](Self::new) or [`new_uninit`](Self::new_uninit)
 #[repr(align(4))]
 pub struct CappedRecord1<const CAP: usize> {
