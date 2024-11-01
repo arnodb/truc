@@ -366,10 +366,15 @@ where
                 }
                 self.data_to_remove.push(datum_id);
             } else {
-                panic!(
-                    "Could not find datum to remove in previous variant, id = {}",
-                    datum_id
-                );
+                let index = self.data_to_add.iter().position(|&did| did == datum_id);
+                if let Some(index) = index {
+                    self.data_to_add.remove(index);
+                } else {
+                    panic!(
+                        "Could not find datum to remove in previous variant, id = {}",
+                        datum_id
+                    );
+                }
             }
         } else {
             let index = self.data_to_add.iter().position(|&did| did == datum_id);
@@ -584,9 +589,10 @@ mod tests {
         assert_eq!(def.variants[1].to_string(), "1 [1]");
     }
 
+    use super::{DatumDefinition, DatumId};
     use crate::record::{
         definition::RecordDefinitionBuilder,
-        type_resolver::{HostTypeResolver, TypeResolver},
+        type_resolver::{HostTypeResolver, TypeInfo, TypeResolver},
     };
 
     fn add_one<R: TypeResolver>(
@@ -744,5 +750,93 @@ mod tests {
         for variant in def.variants() {
             assert_eq!(def[variant.id].id, variant.id);
         }
+    }
+
+    #[test]
+    fn should_copy_data() {
+        let type_resolver = HostTypeResolver;
+        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        let copy_id = definition.copy_datum(&DatumDefinition {
+            id: DatumId(0),
+            name: "copy".to_owned(),
+            offset: 1,
+            type_info: TypeInfo {
+                name: "foo".to_owned(),
+                size: 3,
+                align: 5,
+            },
+            allow_uninit: true,
+        });
+        let not_copy_id = definition.copy_datum(&DatumDefinition {
+            id: DatumId(0),
+            name: "not_copy".to_owned(),
+            offset: 7,
+            type_info: TypeInfo {
+                name: "foo".to_owned(),
+                size: 11,
+                align: 13,
+            },
+            allow_uninit: false,
+        });
+        definition.close_record_variant();
+
+        assert_eq!(
+            &DatumDefinition {
+                // ID is recomputed
+                id: DatumId(0),
+                name: "copy".to_owned(),
+                // Offset is recomputed
+                offset: 0,
+                type_info: TypeInfo {
+                    name: "foo".to_owned(),
+                    size: 3,
+                    align: 5,
+                },
+                allow_uninit: true,
+            },
+            &definition[copy_id]
+        );
+
+        assert_eq!(
+            &DatumDefinition {
+                // ID is recomputed
+                id: DatumId(1),
+                name: "not_copy".to_owned(),
+                // Offset is recomputed
+                offset: 13,
+                type_info: TypeInfo {
+                    name: "foo".to_owned(),
+                    size: 11,
+                    align: 13,
+                },
+                allow_uninit: false,
+            },
+            &definition[not_copy_id]
+        );
+    }
+
+    #[test]
+    fn should_remove_datum_added_in_first_variant() {
+        let type_resolver = HostTypeResolver;
+        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        let uint_32_id = definition.add_datum_allow_uninit::<u32, _>("uint_32");
+        definition.remove_datum(uint_32_id);
+        definition.close_record_variant();
+        let def = definition.build();
+        assert!(def.variants().next().is_some());
+        assert_eq!(0, def.variants().next().unwrap().data_len());
+    }
+
+    #[test]
+    fn should_remove_datum_added_in_second_variant() {
+        let type_resolver = HostTypeResolver;
+        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        definition.close_record_variant();
+        let uint_32_id = definition.add_datum_allow_uninit::<u32, _>("uint_32");
+        definition.remove_datum(uint_32_id);
+        definition.close_record_variant();
+        let def = definition.build();
+        assert!(def.variants().next().is_some());
+        assert_eq!(0, def.variants().next().unwrap().data_len());
     }
 }
