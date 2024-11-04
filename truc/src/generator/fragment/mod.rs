@@ -1,3 +1,5 @@
+//! See [GeneratorConfig](super::config::GeneratorConfig) to customize the code generation.
+
 use codegen::Scope;
 
 use crate::record::definition::{DatumDefinition, RecordVariant};

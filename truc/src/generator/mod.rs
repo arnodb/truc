@@ -1,3 +1,5 @@
+//! See [GeneratorConfig] to customize the code generation.
+
 use std::collections::BTreeSet;
 
 use codegen::{Scope, Type};
@@ -15,6 +17,7 @@ pub mod fragment;
 const CAP_GENERIC: &str = "const CAP: usize";
 const CAP: &str = "CAP";
 
+/// Generates the code for the given record definition.
 pub fn generate(definition: &RecordDefinition, config: &GeneratorConfig) -> String {
     let mut scope = Scope::new();
 
@@ -80,7 +83,10 @@ This is to be used in custom allocators."#,
     scope.to_string()
 }
 
-pub(crate) fn generate_variant<'a>(
+/// Generates the code for a given record variant.
+///
+/// This function is exposed for testing purpose.
+pub fn generate_variant<'a>(
     definition: &'a RecordDefinition,
     max_type_align: usize,
     variant: &'a RecordVariant,

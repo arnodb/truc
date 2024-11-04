@@ -1,9 +1,13 @@
+//! Serialization features.
+
 use codegen::{Function, Scope};
 use itertools::Itertools;
 
 use super::{FragmentGenerator, FragmentGeneratorSpecs, RecordSpec};
 use crate::generator::{CAP, CAP_GENERIC};
 
+/// Use this generator in [GeneratorConfig](crate::generator::config::GeneratorConfig) in order to
+/// enable serialization features on generated structures.
 pub struct SerdeImplGenerator;
 
 impl SerdeImplGenerator {

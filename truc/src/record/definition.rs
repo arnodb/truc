@@ -1,3 +1,5 @@
+//! Record related structures.
+
 use std::{
     fmt::{Debug, Display, Formatter},
     ops::Index,
@@ -320,8 +322,13 @@ where
     ///
     /// For example if you want to add a datum of type `Vec<MyStruct>` then call it like this:
     ///
-    /// ```no_compile
-    /// add_datum_override::<Vec<()>, _>(
+    /// ```rust
+    /// # use truc::record::definition::{DatumDefinitionOverride, RecordDefinitionBuilder};
+    /// # use truc::record::type_resolver::HostTypeResolver;
+    /// #
+    /// # let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
+    /// #
+    /// builder.add_datum_override::<Vec<()>, _>(
     ///     "my_vec",
     ///     DatumDefinitionOverride {
     ///         // Real type name
@@ -333,7 +340,7 @@ where
     ///         // Same allow_uninit flag
     ///         allow_uninit: None,
     ///     },
-    /// )
+    /// );
     /// ```
     pub fn add_datum_override<T, N>(
         &mut self,

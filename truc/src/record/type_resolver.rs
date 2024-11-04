@@ -1,3 +1,5 @@
+//! Type resolution tools.
+
 use std::collections::{btree_map::Entry, BTreeMap};
 
 use serde::{Deserialize, Serialize};
