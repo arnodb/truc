@@ -312,7 +312,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        generator::fragment::serde::SerdeImplGenerator,
+        generator::fragment::{clone::CloneImplGenerator, serde::SerdeImplGenerator},
         record::{
             definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
             type_resolver::{StaticTypeResolver, TypeResolver},
@@ -400,7 +400,8 @@ mod tests {
             generate(
                 &def,
                 &GeneratorConfig::default_with_custom_generators([
-                    Box::new(SerdeImplGenerator) as Box<dyn FragmentGenerator>
+                    Box::new(CloneImplGenerator) as Box<dyn FragmentGenerator>,
+                    Box::new(SerdeImplGenerator) as Box<dyn FragmentGenerator>,
                 ]),
             );
         }

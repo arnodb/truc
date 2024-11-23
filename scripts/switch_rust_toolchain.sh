@@ -3,6 +3,7 @@
 set -eu
 
 RUST_TOOLCHAIN=
+PIN_FOR_MSRV=
 
 SCRIPTS_DIR=$(dirname "$0")
 BASENAME=$(basename "$0")
@@ -34,6 +35,7 @@ while [ $# -gt 0 ]; do
             ;;
         -m|--msrv)
             RUST_TOOLCHAIN="$MSRV"
+            PIN_FOR_MSRV=1
             shift
             ;;
         -s|--stable)
@@ -79,4 +81,10 @@ then
 else
     echo "Switching $RUST_TOOLCHAIN_FILE to \"$RUST_TOOLCHAIN\""
     echo "$RUST_TOOLCHAIN" >| "$RUST_TOOLCHAIN_FILE"
+
+    if [ x"$PIN_FOR_MSRV" = x1 ]
+    then
+        echo "Pinning dependencies to make build successful..."
+        "$SCRIPTS_DIR/msrv_pin_dependencies.sh"
+    fi
 fi 
