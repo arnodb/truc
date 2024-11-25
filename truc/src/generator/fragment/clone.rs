@@ -19,19 +19,20 @@ impl CloneImplGenerator {
 
         {
             let clone_fn = clone_impl.new_fn("clone").arg_ref_self().ret("Self");
-            for datum in &record_spec.data {
-                clone_fn.line(format!(
-                    "let {} = self.{}().clone();",
-                    datum.name(),
-                    datum.name()
-                ));
-            }
             clone_fn.line(format!(
                 "Self::from({} {{",
                 record_spec.unpacked_record_name
             ));
             for datum in &record_spec.data {
-                clone_fn.line(format!("    {},", datum.name()));
+                if datum.allow_uninit() {
+                    clone_fn.line(format!("    {}: *self.{}(),", datum.name(), datum.name()));
+                } else {
+                    clone_fn.line(format!(
+                        "    {}: self.{}().clone(),",
+                        datum.name(),
+                        datum.name()
+                    ));
+                }
             }
             clone_fn.line("})");
         }
@@ -42,11 +43,19 @@ impl CloneImplGenerator {
                 .arg_mut_self()
                 .arg("source", "&Self");
             for datum in &record_spec.data {
-                clone_from_fn.line(format!(
-                    "self.{}_mut().clone_from(source.{}());",
-                    datum.name(),
-                    datum.name()
-                ));
+                if datum.allow_uninit() {
+                    clone_from_fn.line(format!(
+                        "*self.{}_mut() = *source.{}();",
+                        datum.name(),
+                        datum.name()
+                    ));
+                } else {
+                    clone_from_fn.line(format!(
+                        "self.{}_mut().clone_from(source.{}());",
+                        datum.name(),
+                        datum.name()
+                    ));
+                }
             }
         }
     }
@@ -142,16 +151,14 @@ impl<const CAP: usize> Clone for CappedRecord0<CAP> {
             r#"
 impl<const CAP: usize> Clone for CappedRecord0<CAP> {
     fn clone(&self) -> Self {
-        let integer = self.integer().clone();
-        let not_copy_integer = self.not_copy_integer().clone();
         Self::from(UnpackedRecord0 {
-            integer,
-            not_copy_integer,
+            integer: *self.integer(),
+            not_copy_integer: self.not_copy_integer().clone(),
         })
     }
 
     fn clone_from(&mut self, source: &Self) {
-        self.integer_mut().clone_from(source.integer());
+        *self.integer_mut() = *source.integer();
         self.not_copy_integer_mut().clone_from(source.not_copy_integer());
     }
 }
@@ -210,19 +217,16 @@ impl<const CAP: usize> Clone for CappedRecord0<CAP> {
             r#"
 impl<const CAP: usize> Clone for CappedRecord1<CAP> {
     fn clone(&self) -> Self {
-        let boolean1 = self.boolean1().clone();
-        let integer1 = self.integer1().clone();
-        let not_copy_integer1 = self.not_copy_integer1().clone();
         Self::from(UnpackedRecord1 {
-            boolean1,
-            integer1,
-            not_copy_integer1,
+            boolean1: *self.boolean1(),
+            integer1: *self.integer1(),
+            not_copy_integer1: self.not_copy_integer1().clone(),
         })
     }
 
     fn clone_from(&mut self, source: &Self) {
-        self.boolean1_mut().clone_from(source.boolean1());
-        self.integer1_mut().clone_from(source.integer1());
+        *self.boolean1_mut() = *source.boolean1();
+        *self.integer1_mut() = *source.integer1();
         self.not_copy_integer1_mut().clone_from(source.not_copy_integer1());
     }
 }
