@@ -14,6 +14,10 @@ on:
         required: false
         type: boolean
         default: false
+      with_audit:
+        required: false
+        type: boolean
+        default: false
       with_clippy:
         required: false
         type: boolean
@@ -56,6 +60,13 @@ jobs:
         run: |
           cargo fmt --verbose --all -- --check
           echo "Rustfmt OK" >> "$GITHUB_STEP_SUMMARY"
+
+      - id: audit
+        name: Audit
+        if: ${{ inputs.with_audit }}
+        run: |
+          cargo audit
+          echo "Audit OK" >> "$GITHUB_STEP_SUMMARY"
 
       - id: clippy
         name: Clippy

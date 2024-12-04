@@ -12,6 +12,7 @@ jobs:
     with:
       rust_toolchain: stable
       with_rustfmt: true
+      with_audit: true
 
   main_1_56_1:
     name: Rust 1.56.1
