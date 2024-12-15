@@ -23,6 +23,22 @@ pub fn convert_vec_in_place<T, U, C>(input: Vec<T>, convert: C) -> Vec<U>
 where
     C: Fn(T, Option<&mut U>) -> VecElementConversionResult<U> + std::panic::RefUnwindSafe,
 {
+    try_convert_vec_in_place(input, |t, u| -> Result<_, ()> { Ok(convert(t, u)) }).unwrap()
+}
+
+/// Converts a vector of `T` to a vector of `U` where `T` and `U` have the same size in memory and
+/// the same alignment rule according to the Rust compiler.
+///
+/// If the provided converter panics then your memory is safe: no invalid access is performed,
+/// values that need to be dropped are dropped.
+///
+/// Note: the 2 required conditions are checked at runtime. However it is reasonably expected that
+/// those runtime checks are optimized statically by the compiler: NOOP or pure panic.
+pub fn try_convert_vec_in_place<T, U, C, E>(input: Vec<T>, convert: C) -> Result<Vec<U>, E>
+where
+    C: Fn(T, Option<&mut U>) -> Result<VecElementConversionResult<U>, E>
+        + std::panic::RefUnwindSafe,
+{
     // It would be nice to assert that statically. We could use a trait that indicates the
     // invariant but this would have two drawbacks:
     //
@@ -61,75 +77,80 @@ where
     let mut first_moved = 0;
     let mut first_ttt = 0;
 
-    let maybe_panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        while first_ttt < slice.len() {
-            // Bring one T back into auto-drop land
-            let ttt = {
-                let mut ttt = MaybeUninit::<T>::uninit();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(&slice[first_ttt], ttt.as_mut_ptr(), 1);
-                }
-                // The element in the slice is now moved
-                first_ttt += 1;
-                unsafe { ttt.assume_init() }
-            };
-
-            // Convert it
-            let converted = convert(
-                ttt,
-                // Pass a mutable reference on the preceeding converted element if it exists
-                if first_moved > 0 {
-                    Some(unsafe { &mut *(&mut slice[first_moved - 1] as *mut T).cast() })
-                } else {
-                    None
-                },
-            );
-
-            // Store the result
-            match converted {
-                VecElementConversionResult::Converted(uuu) => {
+    let maybe_panic =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<(), E> {
+            while first_ttt < slice.len() {
+                // Bring one T back into auto-drop land
+                let ttt = {
+                    let mut ttt = MaybeUninit::<T>::uninit();
                     unsafe {
-                        std::ptr::write((&mut slice[first_moved] as *mut T).cast(), uuu);
+                        std::ptr::copy_nonoverlapping(&slice[first_ttt], ttt.as_mut_ptr(), 1);
                     }
-                    // The element is now converted
-                    first_moved += 1;
-                }
-                VecElementConversionResult::Abandonned => {
-                    // The element has been abandonned by the converter
+                    // The element in the slice is now moved
+                    first_ttt += 1;
+                    unsafe { ttt.assume_init() }
+                };
+
+                // Convert it
+                let converted = convert(
+                    ttt,
+                    // Pass a mutable reference on the preceeding converted element if it exists
+                    if first_moved > 0 {
+                        Some(unsafe { &mut *(&mut slice[first_moved - 1] as *mut T).cast() })
+                    } else {
+                        None
+                    },
+                )?;
+
+                // Store the result
+                match converted {
+                    VecElementConversionResult::Converted(uuu) => {
+                        unsafe {
+                            std::ptr::write((&mut slice[first_moved] as *mut T).cast(), uuu);
+                        }
+                        // The element is now converted
+                        first_moved += 1;
+                    }
+                    VecElementConversionResult::Abandonned => {
+                        // The element has been abandonned by the converter
+                    }
                 }
             }
+            Ok(())
+        }));
+
+    let clean_on_error = || {
+        // Bring Us back into auto-drop land
+        for element in &slice[0..first_moved] {
+            let mut uuu = MaybeUninit::<U>::uninit();
+            unsafe {
+                std::ptr::copy_nonoverlapping(&*(element as *const T).cast(), uuu.as_mut_ptr(), 1);
+                uuu.assume_init();
+            }
         }
-    }));
+        // Bring Ts back into auto-drop land
+        for element in &slice[first_ttt..slice.len()] {
+            let mut ttt = MaybeUninit::<T>::uninit();
+            unsafe {
+                std::ptr::copy_nonoverlapping(element, ttt.as_mut_ptr(), 1);
+                ttt.assume_init();
+            }
+        }
+    };
 
     match maybe_panic {
-        Ok(()) => {
+        Ok(Ok(())) => {
             unsafe {
                 manually_drop.set_len(first_moved);
             }
-            unsafe { std::mem::transmute(ManuallyDrop::into_inner(manually_drop)) }
+            Ok(unsafe { std::mem::transmute(ManuallyDrop::into_inner(manually_drop)) })
+        }
+        Ok(Err(err)) => {
+            clean_on_error();
+            Err(err)
         }
         Err(err) => {
-            dbg!(first_moved);
-            // Bring Us back into auto-drop land
-            for element in &slice[0..first_moved] {
-                let mut uuu = MaybeUninit::<U>::uninit();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(
-                        &*(element as *const T).cast(),
-                        uuu.as_mut_ptr(),
-                        1,
-                    );
-                    uuu.assume_init();
-                }
-            }
-            // Bring Ts back into auto-drop land
-            for element in &slice[first_ttt..slice.len()] {
-                let mut ttt = MaybeUninit::<T>::uninit();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(element, ttt.as_mut_ptr(), 1);
-                    ttt.assume_init();
-                }
-            }
+            clean_on_error();
             panic!("{:?}", err);
         }
     }
