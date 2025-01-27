@@ -373,7 +373,7 @@ mod tests {
 
         let type_resolver = {
             let mut resolver = StaticTypeResolver::default();
-            resolver.add_std_types();
+            resolver.add_all_types();
             resolver
         };
 

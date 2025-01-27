@@ -69,7 +69,7 @@ fn build_type_resolver(cross_compilation: &CrossCompilation) -> StaticTypeResolv
     match cross_compilation {
         CrossCompilation::No => {
             let mut resolver = StaticTypeResolver::new();
-            resolver.add_std_types();
+            resolver.add_all_types();
             resolver.add_type::<MachinEnum>();
             resolver
         }

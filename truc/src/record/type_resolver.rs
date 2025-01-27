@@ -69,6 +69,45 @@ impl TypeResolver for HostTypeResolver {
     }
 }
 
+macro_rules! add_type {
+    ($resolver:ident, $type:ty) => {
+        $resolver.add_type::<$type>();
+        $resolver.add_type::<Option<$type>>();
+    };
+    ($resolver:ident, $type:ty, allow_uninit) => {
+        $resolver.add_type_allow_uninit::<$type>();
+        $resolver.add_type_allow_uninit::<Option<$type>>();
+    };
+}
+macro_rules! add_type_and_arrays {
+    ($resolver:ident, $type:ty) => {
+        add_type!($resolver, $type);
+        add_type!($resolver, [$type; 1]);
+        add_type!($resolver, [$type; 2]);
+        add_type!($resolver, [$type; 3]);
+        add_type!($resolver, [$type; 4]);
+        add_type!($resolver, [$type; 5]);
+        add_type!($resolver, [$type; 6]);
+        add_type!($resolver, [$type; 7]);
+        add_type!($resolver, [$type; 8]);
+        add_type!($resolver, [$type; 9]);
+        add_type!($resolver, [$type; 10]);
+    };
+    ($resolver:ident, $type:ty, allow_uninit) => {
+        add_type!($resolver, $type, allow_uninit);
+        add_type!($resolver, [$type; 1], allow_uninit);
+        add_type!($resolver, [$type; 2], allow_uninit);
+        add_type!($resolver, [$type; 3], allow_uninit);
+        add_type!($resolver, [$type; 4], allow_uninit);
+        add_type!($resolver, [$type; 5], allow_uninit);
+        add_type!($resolver, [$type; 6], allow_uninit);
+        add_type!($resolver, [$type; 7], allow_uninit);
+        add_type!($resolver, [$type; 8], allow_uninit);
+        add_type!($resolver, [$type; 9], allow_uninit);
+        add_type!($resolver, [$type; 10], allow_uninit);
+    };
+}
+
 /// A type resolved that loads precomputed type information.
 ///
 /// In addition to allowing a good level of customization, it is also very useful for
@@ -150,69 +189,42 @@ impl StaticTypeResolver {
     /// * `Box<str>`
     /// * `Vec<()>` which is enough to support any kind of vector
     pub fn add_std_types(&mut self) {
-        macro_rules! add_type {
-            ($type:ty) => {
-                self.add_type::<$type>();
-                self.add_type::<Option<$type>>();
-            };
-            ($type:ty, allow_uninit) => {
-                self.add_type_allow_uninit::<$type>();
-                self.add_type_allow_uninit::<Option<$type>>();
-            };
-        }
-        macro_rules! add_type_and_arrays {
-            ($type:ty) => {
-                add_type!($type);
-                add_type!([$type; 1]);
-                add_type!([$type; 2]);
-                add_type!([$type; 3]);
-                add_type!([$type; 4]);
-                add_type!([$type; 5]);
-                add_type!([$type; 6]);
-                add_type!([$type; 7]);
-                add_type!([$type; 8]);
-                add_type!([$type; 9]);
-                add_type!([$type; 10]);
-            };
-            ($type:ty, allow_uninit) => {
-                add_type!($type, allow_uninit);
-                add_type!([$type; 1], allow_uninit);
-                add_type!([$type; 2], allow_uninit);
-                add_type!([$type; 3], allow_uninit);
-                add_type!([$type; 4], allow_uninit);
-                add_type!([$type; 5], allow_uninit);
-                add_type!([$type; 6], allow_uninit);
-                add_type!([$type; 7], allow_uninit);
-                add_type!([$type; 8], allow_uninit);
-                add_type!([$type; 9], allow_uninit);
-                add_type!([$type; 10], allow_uninit);
-            };
-        }
-        add_type_and_arrays!(u8, allow_uninit);
-        add_type_and_arrays!(u16, allow_uninit);
-        add_type_and_arrays!(u32, allow_uninit);
-        add_type_and_arrays!(u64, allow_uninit);
-        add_type_and_arrays!(u128, allow_uninit);
-        add_type_and_arrays!(usize, allow_uninit);
+        add_type_and_arrays!(self, u8, allow_uninit);
+        add_type_and_arrays!(self, u16, allow_uninit);
+        add_type_and_arrays!(self, u32, allow_uninit);
+        add_type_and_arrays!(self, u64, allow_uninit);
+        add_type_and_arrays!(self, u128, allow_uninit);
+        add_type_and_arrays!(self, usize, allow_uninit);
 
-        add_type_and_arrays!(i8, allow_uninit);
-        add_type_and_arrays!(i16, allow_uninit);
-        add_type_and_arrays!(i32, allow_uninit);
-        add_type_and_arrays!(i64, allow_uninit);
-        add_type_and_arrays!(i128, allow_uninit);
-        add_type_and_arrays!(isize, allow_uninit);
+        add_type_and_arrays!(self, i8, allow_uninit);
+        add_type_and_arrays!(self, i16, allow_uninit);
+        add_type_and_arrays!(self, i32, allow_uninit);
+        add_type_and_arrays!(self, i64, allow_uninit);
+        add_type_and_arrays!(self, i128, allow_uninit);
+        add_type_and_arrays!(self, isize, allow_uninit);
 
-        add_type_and_arrays!(f32, allow_uninit);
-        add_type_and_arrays!(f64, allow_uninit);
+        add_type_and_arrays!(self, f32, allow_uninit);
+        add_type_and_arrays!(self, f64, allow_uninit);
 
-        add_type_and_arrays!(char, allow_uninit);
+        add_type_and_arrays!(self, char, allow_uninit);
 
-        add_type_and_arrays!(bool, allow_uninit);
+        add_type_and_arrays!(self, bool, allow_uninit);
 
-        add_type_and_arrays!(String);
-        add_type_and_arrays!(Box<str>);
+        add_type_and_arrays!(self, String);
+        add_type_and_arrays!(self, Box<str>);
 
-        add_type_and_arrays!(Vec<()>);
+        add_type_and_arrays!(self, Vec<()>);
+    }
+
+    #[cfg(feature = "uuid")]
+    pub fn add_uuid_types(&mut self) {
+        add_type_and_arrays!(self, uuid::Uuid, allow_uninit);
+    }
+
+    pub fn add_all_types(&mut self) {
+        self.add_std_types();
+        #[cfg(feature = "uuid")]
+        self.add_uuid_types();
     }
 
     /// Serialization to a `serde_json::Value`.
@@ -268,7 +280,7 @@ mod tests {
     fn test_static_type_resolver() {
         let mut type_infos = StaticTypeResolver::default();
 
-        type_infos.add_std_types();
+        type_infos.add_all_types();
 
         let json = type_infos.to_json_value().unwrap();
         type_infos.to_json_string().unwrap();
