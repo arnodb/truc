@@ -10,7 +10,6 @@ fn main() {
     use crate::truc::*;
 
     let not_oks = (0..42)
-        .into_iter()
         .map({
             let mut prevs = Vec::new();
             move |i| {

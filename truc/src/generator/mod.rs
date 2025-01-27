@@ -29,7 +29,7 @@ pub fn generate(definition: &RecordDefinition, config: &GeneratorConfig) -> Stri
     let max_type_align = definition.max_type_align();
     let max_size = definition.max_size();
 
-    scope.raw(&format!(
+    scope.raw(format!(
         r#"/// Maximum size of the record, regardless of the record variant.
 ///
 /// Use that value, or a greater value, as the `CAP` const generic of every record.
@@ -74,7 +74,7 @@ This is to be used in custom allocators."#,
     // This checks there is no type substitution which could lead to unsafe
     // code due to different type size.
     for (type_name, size) in type_size_assertions {
-        scope.raw(&format!(
+        scope.raw(format!(
             "const_assert_eq!(std::mem::size_of::<{}>(), {});",
             type_name, size
         ));

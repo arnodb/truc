@@ -131,7 +131,7 @@ impl SerdeImplGenerator {
 
         Self::generate_visitor(record_spec, deserialize_fn);
 
-        deserialize_fn.line(&format!(
+        deserialize_fn.line(format!(
             "deserializer.deserialize_tuple({}, RecordVisitor::<{}>)",
             record_spec.data.len(),
             CAP

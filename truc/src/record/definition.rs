@@ -291,7 +291,7 @@ where
     {
         let datum_id = self.datum_definitions.push(
             name.into(),
-            std::usize::MAX,
+            usize::MAX,
             self.type_resolver.type_info::<T>(),
             false,
         );
@@ -310,7 +310,7 @@ where
     {
         let datum_id = self.datum_definitions.push(
             name.into(),
-            std::usize::MAX,
+            usize::MAX,
             self.type_resolver.type_info::<T>(),
             true,
         );
@@ -352,7 +352,7 @@ where
     {
         let datum_id = self.datum_definitions.push(
             name.into(),
-            std::usize::MAX,
+            usize::MAX,
             {
                 let mut target_info = self.type_resolver.type_info::<T>();
                 if let Some(type_name) = datum_override.type_name {
@@ -381,7 +381,7 @@ where
         let dynamic_type_info = self.type_resolver.dynamic_type_info(r#type.as_ref());
         let datum_id = self.datum_definitions.push(
             name.into(),
-            std::usize::MAX,
+            usize::MAX,
             dynamic_type_info.info,
             dynamic_type_info.allow_uninit,
         );
@@ -393,7 +393,7 @@ where
     pub fn copy_datum(&mut self, datum: &DatumDefinition) -> DatumId {
         let datum_id = self.datum_definitions.push(
             datum.name().into(),
-            std::usize::MAX,
+            usize::MAX,
             datum.type_info().clone(),
             datum.allow_uninit(),
         );

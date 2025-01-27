@@ -46,7 +46,7 @@ impl GeneratorConfig {
         Self::new(
             Self::common_fragment_generators()
                 .into_iter()
-                .chain(custom_generators.into_iter()),
+                .chain(custom_generators),
         )
     }
 }

@@ -49,6 +49,12 @@ jobs:
           toolchain: ${{ inputs.rust_toolchain }}
           components: rustfmt, clippy
 
+      - id: quickinstall
+        name: Install cargo-quickinstall
+        if: ${{ inputs.with_audit }}
+        run: |
+          cargo install cargo-quickinstall
+
       - id: pre_build_script
         name: Pre build script
         if: ${{ inputs.pre_build_script }}
@@ -65,6 +71,7 @@ jobs:
         name: Audit
         if: ${{ inputs.with_audit }}
         run: |
+          cargo quickinstall cargo-audit
           cargo audit
           echo "Audit OK" >> "$GITHUB_STEP_SUMMARY"
 

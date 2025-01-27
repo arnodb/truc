@@ -143,7 +143,9 @@ where
             unsafe {
                 manually_drop.set_len(first_moved);
             }
-            Ok(unsafe { std::mem::transmute(ManuallyDrop::into_inner(manually_drop)) })
+            Ok(unsafe {
+                std::mem::transmute::<Vec<T>, Vec<U>>(ManuallyDrop::into_inner(manually_drop))
+            })
         }
         Ok(Err(err)) => {
             clean_on_error();

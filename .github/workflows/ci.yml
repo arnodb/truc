@@ -12,6 +12,7 @@ jobs:
     with:
       rust_toolchain: stable
       with_rustfmt: true
+      with_clippy: true
       with_audit: true
 
   main_1_56_1:
@@ -19,7 +20,7 @@ jobs:
     uses: ./.github/workflows/_build.yml
     with:
       rust_toolchain: 1.56.1
-      with_clippy: true
+      rust_features:
       pre_build_script: ./scripts/msrv_pin_dependencies.sh
 
   main_nightly:

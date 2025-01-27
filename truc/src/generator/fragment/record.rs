@@ -42,7 +42,7 @@ It may be created from initial data via one of [`new`](Self::new) or [`new_unini
                     ));
         }
 
-        scope.raw(&format!(
+        scope.raw(format!(
             r#"/// Record variant #{} with optimized capacity.
 pub type {} = {}<{{ MAX_SIZE }}>;"#,
             record_spec.variant.id(),
