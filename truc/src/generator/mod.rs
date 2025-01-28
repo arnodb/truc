@@ -96,15 +96,13 @@ pub fn generate_variant<'a>(
     type_size_assertions: &mut BTreeSet<(&'a str, usize)>,
 ) -> RecordSpec<'a> {
     let data = variant
-        .data()
-        .sorted()
+        .data_sorted()
         .map(|d| &definition[d])
         .collect::<Vec<_>>();
     let (minus_data, plus_data) = if let Some(prev_record_spec) = &prev_record_spec {
         prev_record_spec
             .variant
-            .data()
-            .sorted()
+            .data_sorted()
             .merge_join_by(&data, |left_id, right| left_id.cmp(&right.id()))
             .filter_map(|either| match either {
                 EitherOrBoth::Left(left_id) => Some(Either::Left(&definition[left_id])),

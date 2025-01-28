@@ -5,6 +5,8 @@ use std::{
     ops::Index,
 };
 
+use itertools::Itertools;
+
 use crate::record::type_resolver::{TypeInfo, TypeResolver};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
@@ -123,6 +125,10 @@ impl RecordVariant {
 
     pub fn data(&self) -> impl Iterator<Item = DatumId> + '_ {
         self.data.iter().copied()
+    }
+
+    pub fn data_sorted(&self) -> impl Iterator<Item = DatumId> + '_ {
+        self.data.iter().copied().sorted()
     }
 
     pub fn data_len(&self) -> usize {
