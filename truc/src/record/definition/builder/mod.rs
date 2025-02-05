@@ -1,251 +1,14 @@
-//! Record related structures.
+use std::ops::Index;
 
-use std::{
-    fmt::{Debug, Display, Formatter},
-    ops::Index,
+use variant::RecordVariantBuilder;
+
+use super::{
+    DatumDefinition, DatumDefinitionCollection, DatumId, RecordDefinition, RecordVariant,
+    RecordVariantId,
 };
+use crate::record::type_resolver::TypeResolver;
 
-use itertools::Itertools;
-
-use crate::record::type_resolver::{TypeInfo, TypeResolver};
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
-pub struct DatumId(usize);
-
-impl Debug for DatumId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{}", self.0))
-    }
-}
-
-#[derive(PartialEq, Eq, Debug, new)]
-pub struct DatumDefinition {
-    id: DatumId,
-    name: String,
-    offset: usize,
-    type_info: TypeInfo,
-    allow_uninit: bool,
-}
-
-impl DatumDefinition {
-    pub fn id(&self) -> DatumId {
-        self.id
-    }
-
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn offset(&self) -> usize {
-        self.offset
-    }
-
-    pub fn size(&self) -> usize {
-        self.type_info.size
-    }
-
-    pub fn type_info(&self) -> &TypeInfo {
-        &self.type_info
-    }
-
-    pub fn type_name(&self) -> &str {
-        &self.type_info.name
-    }
-
-    pub fn type_align(&self) -> usize {
-        self.type_info.align
-    }
-
-    pub fn allow_uninit(&self) -> bool {
-        self.allow_uninit
-    }
-}
-
-impl Display for DatumDefinition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}: {} ({}, align {}, offset {}, size {})",
-            self.id,
-            self.name,
-            self.type_info.name,
-            self.type_info.align,
-            self.offset,
-            self.type_info.size
-        )?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default)]
-struct DatumDefinitionCollection {
-    data: Vec<DatumDefinition>,
-}
-
-impl DatumDefinitionCollection {
-    fn iter(&self) -> impl Iterator<Item = &DatumDefinition> {
-        self.data.iter()
-    }
-
-    fn get(&self, id: DatumId) -> Option<&DatumDefinition> {
-        self.data.get(id.0)
-    }
-
-    fn get_mut(&mut self, id: DatumId) -> Option<&mut DatumDefinition> {
-        self.data.get_mut(id.0)
-    }
-
-    fn push(
-        &mut self,
-        name: String,
-        offset: usize,
-        type_info: TypeInfo,
-        allow_uninit: bool,
-    ) -> DatumId {
-        let id = DatumId::from(self.data.len());
-        let datum = DatumDefinition::new(id, name, offset, type_info, allow_uninit);
-        self.data.push(datum);
-        id
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
-pub struct RecordVariantId(usize);
-
-#[derive(PartialEq, Eq, Debug, new)]
-pub struct RecordVariant {
-    id: RecordVariantId,
-    data: Vec<DatumId>,
-}
-
-impl RecordVariant {
-    pub fn id(&self) -> RecordVariantId {
-        self.id
-    }
-
-    pub fn data(&self) -> impl Iterator<Item = DatumId> + '_ {
-        self.data.iter().copied()
-    }
-
-    pub fn data_sorted(&self) -> impl Iterator<Item = DatumId> + '_ {
-        self.data.iter().copied().sorted()
-    }
-
-    pub fn data_len(&self) -> usize {
-        self.data.len()
-    }
-
-    fn fmt_representation(
-        &self,
-        datum_definitions: &DatumDefinitionCollection,
-        f: &mut Formatter<'_>,
-    ) -> std::fmt::Result {
-        write!(f, "{} [", self.id)?;
-        let mut first = true;
-        let mut byte_offset = 0;
-        for &d in &self.data {
-            if !first {
-                write!(f, ", ")?;
-            }
-            let datum = datum_definitions
-                .get(d)
-                .unwrap_or_else(|| panic!("datum #{}", d));
-            if byte_offset > datum.offset() {
-                panic!("offset clash {} > {}", byte_offset, datum.offset());
-            }
-            if byte_offset < datum.offset() {
-                write!(f, "(void, {}), ", datum.offset() - byte_offset)?;
-            }
-            write!(f, "{}", datum)?;
-            first = false;
-            byte_offset = datum.offset() + datum.size();
-        }
-        write!(f, "]")?;
-        Ok(())
-    }
-}
-
-impl Display for RecordVariant {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} [", self.id)?;
-        let mut first = true;
-        for d in &self.data {
-            if !first {
-                write!(f, ", ")?;
-            }
-            write!(f, "{}", d)?;
-            first = false;
-        }
-        write!(f, "]")?;
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct RecordDefinition {
-    datum_definitions: DatumDefinitionCollection,
-    variants: Vec<RecordVariant>,
-}
-
-impl RecordDefinition {
-    pub fn datum_definitions(&self) -> impl Iterator<Item = &DatumDefinition> {
-        self.datum_definitions.iter()
-    }
-
-    pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition> {
-        self.datum_definitions.get(id)
-    }
-
-    pub fn variants(&self) -> impl Iterator<Item = &RecordVariant> {
-        self.variants.iter()
-    }
-
-    pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
-        self.variants.get(id.0)
-    }
-
-    pub fn max_type_align(&self) -> usize {
-        self.datum_definitions()
-            .map(|d| d.type_align())
-            .reduce(usize::max)
-            .unwrap_or(std::mem::align_of::<()>())
-    }
-
-    pub fn max_size(&self) -> usize {
-        self.datum_definitions()
-            .map(|d| d.offset() + d.size())
-            .max()
-            .unwrap_or(0)
-    }
-}
-
-impl Display for RecordDefinition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for v in &self.variants {
-            v.fmt_representation(&self.datum_definitions, f)?;
-            writeln!(f)?;
-        }
-        Ok(())
-    }
-}
-
-impl Index<DatumId> for RecordDefinition {
-    type Output = DatumDefinition;
-
-    fn index(&self, index: DatumId) -> &Self::Output {
-        self.get_datum_definition(index)
-            .unwrap_or_else(|| panic!("datum #{} not found", index))
-    }
-}
-
-impl Index<RecordVariantId> for RecordDefinition {
-    type Output = RecordVariant;
-
-    fn index(&self, index: RecordVariantId) -> &Self::Output {
-        self.get_variant(index)
-            .unwrap_or_else(|| panic!("variant #{} not found", index))
-    }
-}
+pub mod variant;
 
 pub struct DatumDefinitionOverride {
     pub type_name: Option<String>,
@@ -449,64 +212,30 @@ where
 
     /// Closes the current record variant and allows starting a new one.
     pub fn close_record_variant(&mut self) -> RecordVariantId {
+        self.close_record_variant_with(variant::basic)
+    }
+
+    /// Closes the current record variant and allows starting a new one.
+    pub fn close_record_variant_with<Builder>(&mut self, builder: Builder) -> RecordVariantId
+    where
+        Builder: RecordVariantBuilder,
+    {
         if !self.has_pending_changes() {
             return (self.variants.len() - 1).into();
         }
 
-        let mut data = self
+        let data = self
             .variants
             .last()
             .map(|variant| variant.data.clone())
             .unwrap_or_default();
 
-        // Remove first to optimize space
-        for &datum_id in &self.data_to_remove {
-            let index = data.iter().position(|&did| did == datum_id);
-            if let Some(index) = index {
-                data.remove(index);
-            }
-        }
-        self.data_to_remove.clear();
-
-        // Then add
-        let mut data_caret = 0;
-        let mut byte_caret = 0;
-        let align_bytes =
-            |caret: usize, align: usize| -> usize { (caret + align - 1) / align * align };
-        for &datum_id in &self.data_to_add {
-            let datum = self
-                .datum_definitions
-                .get(datum_id)
-                .unwrap_or_else(|| panic!("datum #{}", datum_id));
-            while data_caret < data.len() {
-                let caret_datum_id = data[data_caret];
-                let caret_datum = self
-                    .datum_definitions
-                    .get(caret_datum_id)
-                    .unwrap_or_else(|| panic!("datum #{}", caret_datum_id));
-                if caret_datum.offset == byte_caret {
-                    data_caret += 1;
-                    byte_caret += caret_datum.size();
-                } else {
-                    let bc = align_bytes(byte_caret, datum.type_align());
-                    if bc + datum.size() <= caret_datum.offset {
-                        byte_caret = bc;
-                        break;
-                    } else {
-                        data_caret += 1;
-                        byte_caret = caret_datum.offset + caret_datum.size();
-                    }
-                }
-            }
-            byte_caret = align_bytes(byte_caret, datum.type_align());
-            data.insert(data_caret, datum_id);
-            let datum_mut = self
-                .datum_definitions
-                .get_mut(datum_id)
-                .unwrap_or_else(|| panic!("datum #{}", datum_id));
-            datum_mut.offset = byte_caret;
-        }
-        self.data_to_add.clear();
+        let data = builder.build(
+            data,
+            std::mem::take(&mut self.data_to_add),
+            std::mem::take(&mut self.data_to_remove),
+            &mut self.datum_definitions,
+        );
 
         // And build variant
         let variant_id = self.variants.len().into();
@@ -616,36 +345,9 @@ mod tests {
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
-    #[test]
-    fn should_display_definition() {
-        let type_resolver = HostTypeResolver;
-        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
-        let uint_32_id = definition.add_datum_allow_uninit::<u32, _>("uint_32");
-        definition.add_datum::<u16, _>("uint_16");
-        definition.close_record_variant();
-        definition.remove_datum(uint_32_id);
-        let def = definition.build();
-        assert_eq!(
-            def.to_string(),
-            concat!(
-                "0 [",
-                "0: uint_32 (u32, align 4, offset 0, size 4), ",
-                "1: uint_16 (u16, align 2, offset 4, size 2)",
-                "]\n",
-                "1 [",
-                "(void, 4), ",
-                "1: uint_16 (u16, align 2, offset 4, size 2)",
-                "]\n"
-            )
-            .to_string()
-        );
-        assert_eq!(def.variants[0].to_string(), "0 [0, 1]");
-        assert_eq!(def.variants[1].to_string(), "1 [1]");
-    }
-
-    use super::{DatumDefinition, DatumId};
+    use super::RecordDefinitionBuilder;
     use crate::record::{
-        definition::RecordDefinitionBuilder,
+        definition::{DatumDefinition, DatumId},
         type_resolver::{HostTypeResolver, TypeInfo, TypeResolver},
     };
 
