@@ -1,8 +1,10 @@
 use crate::record::definition::{DatumDefinitionCollection, DatumId};
 
 mod basic;
+mod dummy;
 
 pub use basic::basic;
+pub use dummy::{append_data, append_data_reverse};
 
 pub trait RecordVariantBuilder {
     fn build(
