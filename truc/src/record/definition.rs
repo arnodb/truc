@@ -582,11 +582,6 @@ where
             variants: self.variants,
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn data(&self) -> &Vec<DatumDefinition> {
-        &self.datum_definitions.data
-    }
 }
 
 impl<R> Index<DatumId> for RecordDefinitionBuilder<R>
@@ -658,20 +653,12 @@ mod tests {
         definition: &mut RecordDefinitionBuilder<R>,
         rng: &mut rand_chacha::ChaCha8Rng,
         i: usize,
-    ) {
+    ) -> DatumId {
         match rng.gen_range(0..4) {
-            0 => {
-                definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i));
-            }
-            1 => {
-                definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i));
-            }
-            2 => {
-                definition.add_datum_allow_uninit::<u32, _>(format!("field_{}", i));
-            }
-            3 => {
-                definition.add_datum_allow_uninit::<u64, _>(format!("field_{}", i));
-            }
+            0 => definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i)),
+            1 => definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i)),
+            2 => definition.add_datum_allow_uninit::<u32, _>(format!("field_{}", i)),
+            3 => definition.add_datum_allow_uninit::<u64, _>(format!("field_{}", i)),
             i => unreachable!("Unhandled value {}", i),
         }
     }
@@ -687,16 +674,16 @@ mod tests {
         for _ in 0..256 {
             let mut definition = RecordDefinitionBuilder::new(&type_resolver);
             let num_data = rng.gen_range(0..=MAX_DATA);
-            for i in 0..num_data {
-                add_one(&mut definition, &mut rng, i);
-            }
+            let data = (0..num_data)
+                .map(|i| add_one(&mut definition, &mut rng, i))
+                .collect::<Vec<DatumId>>();
             definition.close_record_variant();
             let mut removed = BTreeSet::new();
             for _ in 0..(num_data / 5) {
-                let index = rng.gen_range(0..definition.data().len());
+                let index = rng.gen_range(0..data.len());
                 if !removed.contains(&index) {
                     removed.insert(index);
-                    definition.remove_datum(definition.data()[index].id());
+                    definition.remove_datum(data[index]);
                 }
             }
             for i in 0..(num_data / 5) {
@@ -792,7 +779,7 @@ mod tests {
         definition.close_record_variant();
         definition.remove_datum(uint_32_id);
 
-        for datum in definition.data() {
+        for datum in &definition.datum_definitions.data {
             assert_eq!(definition[datum.id].id, datum.id);
         }
 
