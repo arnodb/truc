@@ -31,6 +31,7 @@ jobs:
       - name: Generate code coverage
         run: |
           cargo llvm-cov --workspace \
+            --exclude truc_analyzer \
             --exclude fibonacci \
             --exclude machin \
             --exclude machin_data \
