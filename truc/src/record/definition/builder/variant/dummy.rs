@@ -44,3 +44,130 @@ const _: fn() = || {
     fn assert_impl_all<T: RecordVariantBuilder>(_: T) {}
     assert_impl_all(append_data_reverse);
 };
+
+#[cfg(test)]
+#[cfg_attr(coverage_nightly, coverage(off))]
+mod tests {
+    use std::any::type_name;
+
+    use super::{append_data, append_data_reverse};
+    use crate::record::{
+        definition::{builder::variant::align_bytes, DatumDefinitionCollection, DatumId},
+        type_resolver::TypeInfo,
+    };
+
+    fn add<T: Copy>(
+        name: &str,
+        offset: usize,
+        datum_definitions: &mut DatumDefinitionCollection,
+    ) -> DatumId {
+        if offset != usize::MAX {
+            assert_eq!(align_bytes(offset, std::mem::align_of::<T>()), offset);
+        }
+        datum_definitions.push(
+            name.to_owned(),
+            offset,
+            TypeInfo {
+                name: type_name::<T>().to_owned(),
+                size: std::mem::size_of::<T>(),
+                align: std::mem::align_of::<T>(),
+            },
+            true,
+        )
+    }
+
+    fn data_to_text<'a>(
+        data: &[DatumId],
+        datum_definitions: &'a DatumDefinitionCollection,
+    ) -> Vec<&'a str> {
+        data.iter()
+            .map(|&d| datum_definitions.get(d).unwrap().name())
+            .collect()
+    }
+
+    #[test]
+    fn should_append_data() {
+        let mut datum_definitions = DatumDefinitionCollection::default();
+        // 64 bits
+        // xxxx ____ ____ xxxx ____ xxxx ____ xxxx 1111 ____ 2222 2222
+        // 32 bits
+        // xxxx ____ ____ xxxx ____ xxxx ____ xxxx 1111 2222 2222
+        let data = [
+            add::<u32>("f1", 0, &mut datum_definitions),
+            add::<u32>("f2", 12, &mut datum_definitions),
+            add::<u32>("f3", 20, &mut datum_definitions),
+            add::<u32>("f4", 28, &mut datum_definitions),
+        ]
+        .to_vec();
+
+        let new_id1 = add::<u32>("g1", usize::MAX, &mut datum_definitions);
+        let new_id2 = add::<u64>("g2", usize::MAX, &mut datum_definitions);
+
+        let actual_data = append_data(data, vec![new_id1, new_id2], vec![], &mut datum_definitions);
+
+        assert_eq!(
+            data_to_text(&actual_data, &datum_definitions),
+            vec!["f1", "f2", "f3", "f4", "g1", "g2"]
+        );
+
+        assert_eq!(
+            {
+                let datum = datum_definitions.get(new_id1).unwrap();
+                (datum.name(), datum.offset)
+            },
+            ("g1", 32)
+        );
+
+        #[cfg(target_pointer_width = "64")]
+        let expected = ("g2", 40);
+        #[cfg(not(target_pointer_width = "64"))]
+        let expected = ("g2", 36);
+        assert_eq!(
+            {
+                let datum = datum_definitions.get(new_id2).unwrap();
+                (datum.name(), datum.offset)
+            },
+            expected
+        );
+    }
+
+    #[test]
+    fn should_append_data_reverse() {
+        let mut datum_definitions = DatumDefinitionCollection::default();
+        // xxxx ____ ____ xxxx ____ xxxx ____ xxxx 2222 2222 1111
+        let data = [
+            add::<u32>("f1", 0, &mut datum_definitions),
+            add::<u32>("f2", 12, &mut datum_definitions),
+            add::<u32>("f3", 20, &mut datum_definitions),
+            add::<u32>("f4", 28, &mut datum_definitions),
+        ]
+        .to_vec();
+
+        let new_id1 = add::<u32>("g1", usize::MAX, &mut datum_definitions);
+        let new_id2 = add::<u64>("g2", usize::MAX, &mut datum_definitions);
+
+        let actual_data =
+            append_data_reverse(data, vec![new_id1, new_id2], vec![], &mut datum_definitions);
+
+        assert_eq!(
+            data_to_text(&actual_data, &datum_definitions),
+            vec!["f1", "f2", "f3", "f4", "g2", "g1"]
+        );
+
+        assert_eq!(
+            {
+                let datum = datum_definitions.get(new_id1).unwrap();
+                (datum.name(), datum.offset)
+            },
+            ("g1", 40)
+        );
+
+        assert_eq!(
+            {
+                let datum = datum_definitions.get(new_id2).unwrap();
+                (datum.name(), datum.offset)
+            },
+            ("g2", 32)
+        );
+    }
+}
