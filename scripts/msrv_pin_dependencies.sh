@@ -7,4 +7,6 @@ cargo update -p ppv-lite86 --precise 0.2.17
 cargo update -p derive_more --precise 0.99.17
 cargo update -p pretty_assertions --precise 1.3.0
 cargo update -p libc --precise 0.2.163
+cargo update -p libm --precise 0.2.9
+cargo update -p os_str_bytes --precise 6.1.0
 

@@ -1,0 +1,15 @@
+[package]
+name = "truc_analyzer"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.56.1"
+
+[dependencies]
+average = "0.14"
+clap = { version = "3", features = ["derive"] }
+rand = "0.8"
+rand_chacha = "0.3"
+truc = { path = "../../truc" }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage,coverage_nightly)'] }
