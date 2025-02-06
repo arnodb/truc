@@ -345,8 +345,9 @@ mod tests {
     use pretty_assertions::assert_eq;
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
+    use rstest::rstest;
 
-    use super::RecordDefinitionBuilder;
+    use super::{variant, variant::RecordVariantBuilder, RecordDefinitionBuilder};
     use crate::record::{
         definition::{DatumDefinition, DatumId},
         type_resolver::{HostTypeResolver, TypeInfo, TypeResolver},
@@ -366,8 +367,16 @@ mod tests {
         }
     }
 
-    #[test]
-    fn should_align_offsets_according_to_rust_alignment_rules() {
+    #[rstest]
+    #[case::simple(variant::simple)]
+    #[case::basic(variant::basic)]
+    #[case::append_data(variant::append_data)]
+    #[case::append_data_reverse(variant::append_data_reverse)]
+    fn should_align_offsets_according_to_rust_alignment_rules<Builder>(
+        #[case] variant_builder: Builder,
+    ) where
+        Builder: RecordVariantBuilder + Clone,
+    {
         let mut rng = rand_chacha::ChaCha8Rng::from_entropy();
         println!("Seed: {:#04x?}", rng.get_seed());
 
@@ -380,7 +389,7 @@ mod tests {
             let data = (0..num_data)
                 .map(|i| add_one(&mut definition, &mut rng, i))
                 .collect::<Vec<DatumId>>();
-            definition.close_record_variant();
+            definition.close_record_variant_with(variant_builder.clone());
             let mut removed = BTreeSet::new();
             for _ in 0..(num_data / 5) {
                 let index = rng.gen_range(0..data.len());
