@@ -1,7 +1,5 @@
 use super::DataUpdater;
-use crate::record::definition::{
-    builder::variant::RecordVariantBuilder, DatumDefinitionCollection, DatumId,
-};
+use crate::record::definition::{DatumDefinitionCollection, DatumId};
 
 pub fn append_data(
     mut data: Vec<DatumId>,
@@ -18,12 +16,6 @@ pub fn append_data(
     data
 }
 
-// Inspired by `static_assertions`.
-const _: fn() = || {
-    fn assert_impl_all<T: RecordVariantBuilder>(_: T) {}
-    assert_impl_all(append_data);
-};
-
 pub fn append_data_reverse(
     mut data: Vec<DatumId>,
     data_to_add: Vec<DatumId>,
@@ -38,12 +30,6 @@ pub fn append_data_reverse(
 
     data
 }
-
-// Inspired by `static_assertions`.
-const _: fn() = || {
-    fn assert_impl_all<T: RecordVariantBuilder>(_: T) {}
-    assert_impl_all(append_data_reverse);
-};
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]

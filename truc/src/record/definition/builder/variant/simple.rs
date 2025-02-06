@@ -1,9 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::{align_bytes, DataUpdater};
-use crate::record::definition::{
-    builder::variant::RecordVariantBuilder, DatumDefinition, DatumDefinitionCollection, DatumId,
-};
+use crate::record::definition::{DatumDefinition, DatumDefinitionCollection, DatumId};
 
 #[derive(Debug)]
 struct Gap {
@@ -320,11 +318,6 @@ pub fn simple(
 
     data
 }
-
-const _: fn() = || {
-    fn assert_impl_all<T: RecordVariantBuilder>(_: T) {}
-    assert_impl_all(simple);
-};
 
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]

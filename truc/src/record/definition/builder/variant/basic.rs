@@ -1,7 +1,5 @@
 use super::{align_bytes, DataUpdater};
-use crate::record::definition::{
-    builder::variant::RecordVariantBuilder, DatumDefinitionCollection, DatumId,
-};
+use crate::record::definition::{DatumDefinitionCollection, DatumId};
 
 /// The first [RecordVariantBuilder] implementation.
 ///
@@ -51,9 +49,3 @@ pub fn basic(
 
     data
 }
-
-// Inspired by `static_assertions`.
-const _: fn() = || {
-    fn assert_impl_all<T: RecordVariantBuilder>(_: T) {}
-    assert_impl_all(basic);
-};
