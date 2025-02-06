@@ -401,6 +401,8 @@ mod tests {
             for i in 0..(num_data / 5) {
                 add_one(&mut definition, &mut rng, num_data + i);
             }
+            // Explicitely close the variant with custom variant builder
+            definition.close_record_variant_with(variant_builder.clone());
             let def = definition.build();
             let max_size = def.max_size();
             for datum in def.datum_definitions() {
