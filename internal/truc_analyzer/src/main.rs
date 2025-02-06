@@ -23,6 +23,8 @@ enum CliArgs {
 
 #[derive(Clone, Copy, ValueEnum, Debug)]
 enum VariantBuilder {
+    // simple
+    Simple,
     // basic
     Basic,
     // dummy
@@ -33,6 +35,7 @@ enum VariantBuilder {
 impl From<VariantBuilder> for variant_builder::VariantBuilder {
     fn from(value: VariantBuilder) -> Self {
         match value {
+            VariantBuilder::Simple => variant_builder::VariantBuilder::Simple,
             VariantBuilder::Basic => variant_builder::VariantBuilder::Basic,
             VariantBuilder::AppendData => variant_builder::VariantBuilder::AppendData,
             VariantBuilder::AppendDataReverse => variant_builder::VariantBuilder::AppendDataReverse,

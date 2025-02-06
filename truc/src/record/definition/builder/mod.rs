@@ -212,7 +212,7 @@ where
 
     /// Closes the current record variant and allows starting a new one.
     pub fn close_record_variant(&mut self) -> RecordVariantId {
-        self.close_record_variant_with(variant::basic)
+        self.close_record_variant_with(variant::simple)
     }
 
     /// Closes the current record variant and allows starting a new one.
@@ -342,6 +342,7 @@ where
 mod tests {
     use std::collections::BTreeSet;
 
+    use pretty_assertions::assert_eq;
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
 
@@ -534,7 +535,7 @@ mod tests {
                 id: DatumId(0),
                 name: "copy".to_owned(),
                 // Offset is recomputed
-                offset: 0,
+                offset: 15,
                 type_info: TypeInfo {
                     name: "foo".to_owned(),
                     size: 3,
@@ -551,7 +552,7 @@ mod tests {
                 id: DatumId(1),
                 name: "not_copy".to_owned(),
                 // Offset is recomputed
-                offset: 13,
+                offset: 0,
                 type_info: TypeInfo {
                     name: "foo".to_owned(),
                     size: 11,

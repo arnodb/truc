@@ -17,6 +17,8 @@ pub struct Args {
 
 #[derive(Clone, Copy, Debug)]
 pub enum VariantBuilder {
+    // simple
+    Simple,
     // basic
     Basic,
     // dummy
@@ -65,6 +67,7 @@ pub fn run_variant_builder_statistics(
             let num_data = rng.gen_range(0..=max_data);
             data.extend((0..num_data).map(|i| add_one_datum(&mut definition, &mut rng, i)));
             definition.close_record_variant_with(match builder {
+                VariantBuilder::Simple => truc::record::definition::builder::variant::simple,
                 VariantBuilder::Basic => truc::record::definition::builder::variant::basic,
                 VariantBuilder::AppendData => {
                     truc::record::definition::builder::variant::append_data

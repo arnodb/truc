@@ -246,15 +246,14 @@ mod tests {
                     "]\n",
                     // rv4
                     "{} [",
-                    "{}: d (u8, align 1, offset 0, size 1), ",
-                    "(void, 1), ",
-                    "{}: e (u16, align 2, offset 2, size 2), ",
+                    "{}: f (u32, align 4, offset 0, size 4), ",
                     "{}: b (u32, align 4, offset 4, size 4), ",
                     "{}: c (u32, align 4, offset 8, size 4), ",
-                    "{}: f (u32, align 4, offset 12, size 4)",
+                    "{}: e (u16, align 2, offset 12, size 2), ",
+                    "{}: d (u8, align 1, offset 14, size 1)",
                     "]\n"
                 ),
-                rv1, a, b, rv2, a, b, c, rv3, b, c, rv4, d, e, b, c, f,
+                rv1, a, b, rv2, a, b, c, rv3, b, c, rv4, f, b, c, e, d,
             ),
             def
         );
