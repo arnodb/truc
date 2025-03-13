@@ -5,5 +5,6 @@ edition = "2021"
 rust-version = "1.56.1"
 
 [dependencies]
+clap = { version = "3", features = ["derive"] }
 machin_data = { path = "../machin/data" }
 truc = { path = "../../truc" }
