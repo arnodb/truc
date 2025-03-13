@@ -52,6 +52,7 @@ jobs:
       - run: |
           mkdir -p "target/shared_truc_examples/${{ inputs.target }}/debug"
           ./cross/cross run --target "${{ inputs.target }}" -p examples_target_types >| "target/shared_truc_examples/${{ inputs.target }}/debug/target_types.json"
+          head "target/shared_truc_examples/${{ inputs.target }}/debug/target_types.json"
 
       - run: ./cross/cross test ${{ inputs.rust_features }} --target ${{ inputs.target }} -vv
 

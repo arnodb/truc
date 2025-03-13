@@ -71,6 +71,7 @@ fn build_type_resolver(cross_compilation: &CrossCompilation) -> StaticTypeResolv
             let file_path = shared_path.join("target_types.json");
             let json = std::fs::read_to_string(&file_path)
                 .unwrap_or_else(|err| panic!("Could not read {:?}: {:?}", &file_path, err));
+            dbg!(&json);
             let target_types: BTreeMap<String, DynamicTypeInfo> = serde_json::from_str(&json)
                 .unwrap_or_else(|err| panic!("Could not parse {:?}: {:?}", &file_path, err));
             StaticTypeResolver::from(target_types)
