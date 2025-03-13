@@ -4,7 +4,7 @@ use average::MeanWithError;
 use rand::Rng;
 use rand_chacha::rand_core::SeedableRng;
 use truc::record::{
-    definition::{builder::RecordDefinitionBuilder, DatumId},
+    definition::{builder::native::NativeRecordDefinitionBuilder, DatumId},
     type_resolver::{HostTypeResolver, TypeResolver},
 };
 
@@ -45,7 +45,7 @@ pub fn run_variant_builder_statistics(
     }
 
     for _ in 0..iterations {
-        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        let mut definition = NativeRecordDefinitionBuilder::new(&type_resolver);
 
         let mut data = Vec::<DatumId>::new();
 
@@ -58,22 +58,26 @@ pub fn run_variant_builder_statistics(
                     let index = rng.gen_range(0..data.len());
                     if !removed.contains(&index) {
                         removed.insert(index);
-                        definition.remove_datum(data[index]);
+                        definition.remove_datum(data[index]).unwrap();
                     }
                 }
             }
 
             // Add a random number between 0 and MAX_DATA random data
             let num_data = rng.gen_range(0..=max_data);
-            data.extend((0..num_data).map(|i| add_one_datum(&mut definition, &mut rng, i)));
+            data.extend(
+                (0..num_data).map(|i| add_one_datum(&mut definition, &mut rng, i).unwrap()),
+            );
             definition.close_record_variant_with(match builder {
-                VariantBuilder::Simple => truc::record::definition::builder::variant::simple,
-                VariantBuilder::Basic => truc::record::definition::builder::variant::basic,
+                VariantBuilder::Simple => {
+                    truc::record::definition::builder::native::variant::simple
+                }
+                VariantBuilder::Basic => truc::record::definition::builder::native::variant::basic,
                 VariantBuilder::AppendData => {
-                    truc::record::definition::builder::variant::append_data
+                    truc::record::definition::builder::native::variant::append_data
                 }
                 VariantBuilder::AppendDataReverse => {
-                    truc::record::definition::builder::variant::append_data_reverse
+                    truc::record::definition::builder::native::variant::append_data_reverse
                 }
             });
 
@@ -91,10 +95,10 @@ pub fn run_variant_builder_statistics(
 }
 
 fn add_one_datum<R: TypeResolver>(
-    definition: &mut RecordDefinitionBuilder<R>,
+    definition: &mut NativeRecordDefinitionBuilder<R>,
     rng: &mut rand_chacha::ChaCha8Rng,
     i: usize,
-) -> DatumId {
+) -> Result<DatumId, String> {
     match rng.gen_range(0..4) {
         0 => definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i)),
         1 => definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i)),
@@ -104,14 +108,14 @@ fn add_one_datum<R: TypeResolver>(
     }
 }
 
-fn filled_rate<R: TypeResolver>(definition: &RecordDefinitionBuilder<R>) -> f64 {
+fn filled_rate<R: TypeResolver>(definition: &NativeRecordDefinitionBuilder<R>) -> f64 {
     let mut variant_end = 0;
     let mut filled = 0;
     for datum_id in definition.get_current_data() {
         let datum = &definition[datum_id];
 
-        filled += datum.size();
-        let end = datum.offset() + datum.size();
+        filled += datum.details().size();
+        let end = datum.details().offset() + datum.details().size();
         if end > variant_end {
             variant_end = end;
         }

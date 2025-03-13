@@ -8,7 +8,7 @@ use truc::{
         generate,
     },
     record::{
-        definition::{DatumDefinitionOverride, RecordDefinitionBuilder},
+        definition::builder::native::{DatumDefinitionOverride, NativeRecordDefinitionBuilder},
         type_resolver::{DynamicTypeInfo, StaticTypeResolver},
     },
 };
@@ -92,35 +92,50 @@ fn machin() {
 
     let type_resolver = build_type_resolver(&cross_compilation);
 
-    let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+    let mut definition = NativeRecordDefinitionBuilder::new(&type_resolver);
 
-    let a0 = definition.add_datum_allow_uninit::<u32, _>("datum_a");
-    let b0 = definition.add_datum_allow_uninit::<u32, _>("datum_b");
+    let a0 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_a")
+        .unwrap();
+    let b0 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_b")
+        .unwrap();
     definition.close_record_variant();
 
-    let c1 = definition.add_datum_allow_uninit::<u32, _>("datum_c");
+    let c1 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_c")
+        .unwrap();
     definition.close_record_variant();
 
-    definition.remove_datum(a0);
+    definition.remove_datum(a0).unwrap();
     definition.close_record_variant();
 
-    let d3 = definition.add_datum_allow_uninit::<u8, _>("datum_d");
-    let e3 = definition.add_datum_allow_uninit::<u16, _>("datum_e");
-    let f3 = definition.add_datum_allow_uninit::<u32, _>("datum_f");
+    let d3 = definition
+        .add_datum_allow_uninit::<u8, _>("datum_d")
+        .unwrap();
+    let e3 = definition
+        .add_datum_allow_uninit::<u16, _>("datum_e")
+        .unwrap();
+    let f3 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_f")
+        .unwrap();
     definition.close_record_variant();
     definition.close_record_variant();
 
-    let machin_enum = definition.add_datum::<MachinEnum, _>("machin_enum");
+    let machin_enum = definition
+        .add_datum::<MachinEnum, _>("machin_enum")
+        .unwrap();
     definition.close_record_variant();
 
-    definition.remove_datum(b0);
-    definition.remove_datum(c1);
-    definition.remove_datum(d3);
-    definition.remove_datum(e3);
-    definition.remove_datum(f3);
-    definition.remove_datum(machin_enum);
+    definition.remove_datum(b0).unwrap();
+    definition.remove_datum(c1).unwrap();
+    definition.remove_datum(d3).unwrap();
+    definition.remove_datum(e3).unwrap();
+    definition.remove_datum(f3).unwrap();
+    definition.remove_datum(machin_enum).unwrap();
     let _datum_string = definition.add_datum::<String, _>("datum_string");
     let _datum_array_of_strings = definition.add_datum::<[String; 2], _>("datum_array_of_strings");
+    definition.close_record_variant();
 
     let definition = definition.build();
 
@@ -141,32 +156,35 @@ fn index_first_char() {
 
     let type_resolver = build_type_resolver(&cross_compilation);
 
-    let mut def_1 = RecordDefinitionBuilder::new(&type_resolver);
+    let mut def_1 = NativeRecordDefinitionBuilder::new(&type_resolver);
 
-    let words = def_1.add_datum::<Box<str>, _>("words");
+    let words = def_1.add_datum::<Box<str>, _>("words").unwrap();
     def_1.close_record_variant();
 
-    def_1.remove_datum(words);
-    let word = def_1.add_datum::<Box<str>, _>("word");
+    def_1.remove_datum(words).unwrap();
+    let word = def_1.add_datum::<Box<str>, _>("word").unwrap();
     def_1.close_record_variant();
 
-    def_1.add_datum::<char, _>("first_char");
+    def_1.add_datum::<char, _>("first_char").unwrap();
     def_1.close_record_variant();
 
-    let mut def_2 = RecordDefinitionBuilder::new(&type_resolver);
-    def_2.copy_datum(&def_1[word]);
+    let mut def_2 = NativeRecordDefinitionBuilder::new(&type_resolver);
+    def_2.copy_datum(&def_1[word]).unwrap();
     let group = def_2.close_record_variant();
 
-    def_1.remove_datum(word);
-    def_1.add_datum_override::<Vec<()>, _>(
-        "words",
-        DatumDefinitionOverride {
-            type_name: Some(format!("Vec<super::def_2::Record{}>", group)),
-            size: None,
-            align: None,
-            allow_uninit: None,
-        },
-    );
+    def_1.remove_datum(word).unwrap();
+    def_1
+        .add_datum_override::<Vec<()>, _>(
+            "words",
+            DatumDefinitionOverride {
+                type_name: Some(format!("Vec<super::def_2::Record{}>", group)),
+                size: None,
+                align: None,
+                allow_uninit: None,
+            },
+        )
+        .unwrap();
+    def_1.close_record_variant();
 
     let def_1 = def_1.build();
     let mut file = File::create(out_dir_path.join("index_first_char_1.rs")).unwrap();
@@ -185,32 +203,41 @@ fn serialize_deserialize() {
 
     let type_resolver = build_type_resolver(&cross_compilation);
 
-    let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+    let mut definition = NativeRecordDefinitionBuilder::new(&type_resolver);
 
-    let a0 = definition.add_datum_allow_uninit::<u32, _>("datum_a");
-    let b0 = definition.add_datum_allow_uninit::<u32, _>("datum_b");
+    let a0 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_a")
+        .unwrap();
+    let b0 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_b")
+        .unwrap();
     definition.close_record_variant();
 
-    let c1 = definition.add_datum_allow_uninit::<u32, _>("datum_c");
+    let c1 = definition
+        .add_datum_allow_uninit::<u32, _>("datum_c")
+        .unwrap();
     definition.close_record_variant();
 
-    definition.remove_datum(a0);
+    definition.remove_datum(a0).unwrap();
     definition.close_record_variant();
 
-    let v = definition.add_datum_override::<Vec<()>, _>(
-        "datum_v",
-        DatumDefinitionOverride {
-            type_name: Some("Vec<u32>".to_string()),
-            size: None,
-            align: None,
-            allow_uninit: None,
-        },
-    );
+    let v = definition
+        .add_datum_override::<Vec<()>, _>(
+            "datum_v",
+            DatumDefinitionOverride {
+                type_name: Some("Vec<u32>".to_string()),
+                size: None,
+                align: None,
+                allow_uninit: None,
+            },
+        )
+        .unwrap();
     definition.close_record_variant();
 
-    definition.remove_datum(b0);
-    definition.remove_datum(c1);
-    definition.remove_datum(v);
+    definition.remove_datum(b0).unwrap();
+    definition.remove_datum(c1).unwrap();
+    definition.remove_datum(v).unwrap();
+    definition.close_record_variant();
 
     let definition = definition.build();
 

@@ -1,4 +1,4 @@
-use crate::record::definition::{DatumDefinitionCollection, DatumId};
+use crate::record::definition::{DatumDefinitionCollection, DatumId, NativeDatumDetails};
 
 mod basic;
 mod dummy;
@@ -8,38 +8,8 @@ pub use basic::basic;
 pub use dummy::{append_data, append_data_reverse};
 pub use simple::simple;
 
-pub trait RecordVariantBuilder {
-    fn build(
-        self,
-        data: Vec<DatumId>,
-        data_to_add: Vec<DatumId>,
-        data_to_remove: Vec<DatumId>,
-        datum_definitions: &mut DatumDefinitionCollection,
-    ) -> Vec<DatumId>;
-}
-
-impl<F> RecordVariantBuilder for F
-where
-    F: FnOnce(
-        Vec<DatumId>,
-        Vec<DatumId>,
-        Vec<DatumId>,
-        &mut DatumDefinitionCollection,
-    ) -> Vec<DatumId>,
-{
-    fn build(
-        self,
-        data: Vec<DatumId>,
-        data_to_add: Vec<DatumId>,
-        data_to_remove: Vec<DatumId>,
-        datum_definitions: &mut DatumDefinitionCollection,
-    ) -> Vec<DatumId> {
-        self(data, data_to_add, data_to_remove, datum_definitions)
-    }
-}
-
-pub trait DataUpdater {
-    fn end(&self, datum_definitions: &DatumDefinitionCollection) -> usize;
+pub trait NativeDataUpdater {
+    fn end(&self, datum_definitions: &DatumDefinitionCollection<NativeDatumDetails>) -> usize;
 
     fn remove_data<I>(&mut self, datum_ids: I)
     where
@@ -47,19 +17,19 @@ pub trait DataUpdater {
 
     fn push_datum(
         &mut self,
-        datum_definitions: &mut DatumDefinitionCollection,
+        datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
         datum_id: DatumId,
     ) -> (usize, usize);
 }
 
-impl DataUpdater for Vec<DatumId> {
-    fn end(&self, datum_definitions: &DatumDefinitionCollection) -> usize {
+impl NativeDataUpdater for Vec<DatumId> {
+    fn end(&self, datum_definitions: &DatumDefinitionCollection<NativeDatumDetails>) -> usize {
         self.last()
             .map(|&d| {
                 let datum = datum_definitions
                     .get(d)
                     .unwrap_or_else(|| panic!("datum #{}", d));
-                datum.offset() + datum.size()
+                datum.details().offset() + datum.details().size()
             })
             .unwrap_or(0)
     }
@@ -73,19 +43,19 @@ impl DataUpdater for Vec<DatumId> {
 
     fn push_datum(
         &mut self,
-        datum_definitions: &mut DatumDefinitionCollection,
+        datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
         datum_id: DatumId,
     ) -> (usize, usize) {
         let end = self.end(datum_definitions);
         let datum = datum_definitions
             .get(datum_id)
             .unwrap_or_else(|| panic!("datum #{}", datum_id));
-        let offset = align_bytes(end, datum.type_align());
+        let offset = align_bytes(end, datum.details().type_align());
         self.push(datum_id);
         let datum_mut = datum_definitions
             .get_mut(datum_id)
             .unwrap_or_else(|| panic!("datum #{}", datum_id));
-        datum_mut.offset = offset;
+        datum_mut.details_mut().offset = offset;
         (end, offset)
     }
 }
