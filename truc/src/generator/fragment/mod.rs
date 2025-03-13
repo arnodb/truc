@@ -2,7 +2,7 @@
 
 use codegen::Scope;
 
-use crate::record::definition::{DatumDefinition, RecordVariant};
+use crate::record::definition::{DatumDefinition, NativeDatumDetails, RecordVariant};
 
 pub mod clone;
 pub(crate) mod data_records;
@@ -39,9 +39,9 @@ pub struct RecordSpec<'a> {
     pub unpacked_uninit_record_in_name: String,
     pub unpacked_uninit_safe_record_in_name: String,
     pub record_and_unpacked_out_name: String,
-    pub data: Vec<&'a DatumDefinition>,
-    pub minus_data: Vec<&'a DatumDefinition>,
-    pub plus_data: Vec<&'a DatumDefinition>,
+    pub data: Vec<&'a DatumDefinition<NativeDatumDetails>>,
+    pub minus_data: Vec<&'a DatumDefinition<NativeDatumDetails>>,
+    pub plus_data: Vec<&'a DatumDefinition<NativeDatumDetails>>,
     pub unpacked_uninit_safe_generic: Option<RecordGeneric>,
     pub plus_uninit_safe_generic: Option<RecordGeneric>,
 }

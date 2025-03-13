@@ -95,7 +95,7 @@ impl SerdeImplGenerator {
             visit_seq_fn.line(format!(
                 "let {} = seq.next_element::<{}>()?.ok_or_else(|| A::Error::missing_field(\"{}\"))?;",
                 datum.name(),
-                datum.type_name(),
+                datum.details().type_name(),
                 datum.name(),
             ));
         }
@@ -165,12 +165,15 @@ mod tests {
     use super::*;
     use crate::{
         generator::{config::GeneratorConfig, generate_variant, tests::assert_fragment_eq},
-        record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver},
+        record::{
+            definition::builder::native::NativeRecordDefinitionBuilder,
+            type_resolver::HostTypeResolver,
+        },
     };
 
     #[test]
     fn should_generate_empty_serde_impl() {
-        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
+        let mut builder = NativeRecordDefinitionBuilder::new(HostTypeResolver);
         builder.close_record_variant();
         let definition = builder.build();
 
@@ -242,9 +245,9 @@ impl<'de, const CAP: usize> serde::Deserialize<'de> for CappedRecord0<CAP> {
 
     #[test]
     fn should_generate_serde_impl_with_data() {
-        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
-        builder.add_datum_allow_uninit::<u32, _>("integer");
-        builder.add_datum::<u32, _>("not_copy_integer");
+        let mut builder = NativeRecordDefinitionBuilder::new(HostTypeResolver);
+        builder.add_datum_allow_uninit::<u32, _>("integer").unwrap();
+        builder.add_datum::<u32, _>("not_copy_integer").unwrap();
         builder.close_record_variant();
         let definition = builder.build();
 
@@ -323,15 +326,21 @@ impl<'de, const CAP: usize> serde::Deserialize<'de> for CappedRecord0<CAP> {
 
     #[test]
     fn should_generate_next_serde_impl_with_data() {
-        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
-        let i0 = builder.add_datum_allow_uninit::<u32, _>("integer0");
-        let nci0 = builder.add_datum::<u32, _>("not_copy_integer0");
-        builder.add_datum_allow_uninit::<bool, _>("boolean1");
+        let mut builder = NativeRecordDefinitionBuilder::new(HostTypeResolver);
+        let i0 = builder
+            .add_datum_allow_uninit::<u32, _>("integer0")
+            .unwrap();
+        let nci0 = builder.add_datum::<u32, _>("not_copy_integer0").unwrap();
+        builder
+            .add_datum_allow_uninit::<bool, _>("boolean1")
+            .unwrap();
         builder.close_record_variant();
-        builder.remove_datum(i0);
-        builder.remove_datum(nci0);
-        builder.add_datum_allow_uninit::<u32, _>("integer1");
-        builder.add_datum::<u32, _>("not_copy_integer1");
+        builder.remove_datum(i0).unwrap();
+        builder.remove_datum(nci0).unwrap();
+        builder
+            .add_datum_allow_uninit::<u32, _>("integer1")
+            .unwrap();
+        builder.add_datum::<u32, _>("not_copy_integer1").unwrap();
         builder.close_record_variant();
         let definition = builder.build();
 

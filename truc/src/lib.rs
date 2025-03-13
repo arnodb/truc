@@ -91,7 +91,7 @@
 //! [HostTypeResolver](crate::record::type_resolver::HostTypeResolver) will work in most cases.
 //!
 //! Then the definitions are built with
-//! [RecordDefinitionBuilder](crate::record::definition::RecordDefinitionBuilder).
+//! [NativeRecordDefinitionBuilder](crate::record::definition::builder::native::NativeRecordDefinitionBuilder).
 //!
 //! Once you have your definitions set up, you just need to generate the Rust definitions to an output file.
 //!
@@ -102,24 +102,27 @@
 //!
 //! use truc::{
 //!     generator::{config::GeneratorConfig, generate},
-//!     record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver},
+//!     record::{
+//!         definition::builder::native::NativeRecordDefinitionBuilder,
+//!         type_resolver::HostTypeResolver,
+//!     },
 //! };
 //!
 //! fn main() {
-//!     let mut definition = RecordDefinitionBuilder::new(&HostTypeResolver);
+//!     let mut definition = NativeRecordDefinitionBuilder::new(&HostTypeResolver);
 //!
 //!     // First variant with an integer
-//!     let integer_id = definition.add_datum_allow_uninit::<usize, _>("integer");
+//!     let integer_id = definition.add_datum_allow_uninit::<usize, _>("integer").unwrap();
 //!     definition.close_record_variant();
 //!
 //!     // Second variant with a string
-//!     let string_id = definition.add_datum::<String, _>("string");
-//!     definition.remove_datum(integer_id);
+//!     let string_id = definition.add_datum::<String, _>("string").unwrap();
+//!     definition.remove_datum(integer_id).unwrap();
 //!     definition.close_record_variant();
 //!
 //!     // Remove the integer and replace it with another
-//!     definition.add_datum_allow_uninit::<isize, _>("signed_integer");
-//!     definition.remove_datum(string_id);
+//!     definition.add_datum_allow_uninit::<isize, _>("signed_integer").unwrap();
+//!     definition.remove_datum(string_id).unwrap();
 //!     definition.close_record_variant();
 //!
 //!     // Build
@@ -199,27 +202,29 @@ pub mod record;
 mod tests {
     use pretty_assertions::assert_eq;
 
-    use crate::record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver};
+    use crate::record::{
+        definition::builder::native::NativeRecordDefinitionBuilder, type_resolver::HostTypeResolver,
+    };
 
     #[test]
     fn it_works() {
         let type_resolver = HostTypeResolver;
 
-        let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+        let mut definition = NativeRecordDefinitionBuilder::new(&type_resolver);
 
-        let a = definition.add_datum::<u32, _>("a");
-        let b = definition.add_datum::<u32, _>("b");
+        let a = definition.add_datum::<u32, _>("a").unwrap();
+        let b = definition.add_datum::<u32, _>("b").unwrap();
         let rv1 = definition.close_record_variant();
 
-        let c = definition.add_datum::<u32, _>("c");
+        let c = definition.add_datum::<u32, _>("c").unwrap();
         let rv2 = definition.close_record_variant();
 
-        definition.remove_datum(a);
+        definition.remove_datum(a).unwrap();
         let rv3 = definition.close_record_variant();
 
-        let d = definition.add_datum::<u8, _>("d");
-        let e = definition.add_datum::<u16, _>("e");
-        let f = definition.add_datum::<u32, _>("f");
+        let d = definition.add_datum::<u8, _>("d").unwrap();
+        let e = definition.add_datum::<u16, _>("e").unwrap();
+        let f = definition.add_datum::<u32, _>("f").unwrap();
         let rv4 = definition.close_record_variant();
 
         let definition = definition.build();

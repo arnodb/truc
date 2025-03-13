@@ -6,7 +6,7 @@ use itertools::Itertools;
 use super::{FragmentGenerator, FragmentGeneratorSpecs, RecordSpec};
 use crate::{
     generator::{CAP, CAP_GENERIC},
-    record::definition::DatumDefinition,
+    record::definition::{DatumDefinition, NativeDatumDetails},
 };
 
 #[derive(Debug)]
@@ -40,7 +40,10 @@ impl RecordImplGenerator {
             )
             .ret("Self");
         let uninit_has_data = if let UninitKind::Uninit { safe_record_name } = uninit_kind {
-            let uninit_has_data = record_spec.data.iter().any(|datum| !datum.allow_uninit());
+            let uninit_has_data = record_spec
+                .data
+                .iter()
+                .any(|datum| !datum.details().allow_uninit());
             new_fn.line(format!(
                 "let {} = {}{}::from(from);",
                 if uninit_has_data { "from" } else { "_from" },
@@ -61,14 +64,12 @@ impl RecordImplGenerator {
                 _ => "",
             },
         ));
-        for datum in record_spec
-            .data
-            .iter()
-            .filter(|datum| matches!(uninit_kind, UninitKind::Full) || !datum.allow_uninit())
-        {
+        for datum in record_spec.data.iter().filter(|datum| {
+            matches!(uninit_kind, UninitKind::Full) || !datum.details().allow_uninit()
+        }) {
             new_fn.line(format!(
                 "unsafe {{ data.write({}, from.{}); }}",
-                datum.offset(),
+                datum.details().offset(),
                 datum.name()
             ));
         }
@@ -76,7 +77,7 @@ impl RecordImplGenerator {
     }
 
     fn generate_unpacker(
-        data: &[&DatumDefinition],
+        data: &[&DatumDefinition<NativeDatumDetails>],
         unpacked_record_name: &str,
         record_impl: &mut Impl,
     ) {
@@ -89,8 +90,8 @@ impl RecordImplGenerator {
             unpack_fn.line(format!(
                 "let {}: {} = unsafe {{ self.data.read({}) }};",
                 datum.name(),
-                datum.type_name(),
-                datum.offset(),
+                datum.details().type_name(),
+                datum.details().offset(),
             ));
         }
         unpack_fn.line("std::mem::forget(self);");
@@ -141,22 +142,22 @@ impl FragmentGenerator for RecordImplGenerator {
                 .new_fn(datum.name())
                 .vis("pub")
                 .arg_ref_self()
-                .ret(format!("&{}", datum.type_name()))
+                .ret(format!("&{}", datum.details().type_name()))
                 .line(format!(
                     "unsafe {{ self.data.get::<{}>({}) }}",
-                    datum.type_name(),
-                    datum.offset()
+                    datum.details().type_name(),
+                    datum.details().offset()
                 ));
 
             record_impl
                 .new_fn(&format!("{}_mut", datum.name()))
                 .vis("pub")
                 .arg_mut_self()
-                .ret(format!("&mut {}", datum.type_name()))
+                .ret(format!("&mut {}", datum.details().type_name()))
                 .line(format!(
                     "unsafe {{ self.data.get_mut::<{}>({}) }}",
-                    datum.type_name(),
-                    datum.offset()
+                    datum.details().type_name(),
+                    datum.details().offset()
                 ));
         }
     }
@@ -173,12 +174,15 @@ mod tests {
     use super::*;
     use crate::{
         generator::{config::GeneratorConfig, generate_variant, tests::assert_fragment_eq},
-        record::{definition::RecordDefinitionBuilder, type_resolver::HostTypeResolver},
+        record::{
+            definition::builder::native::NativeRecordDefinitionBuilder,
+            type_resolver::HostTypeResolver,
+        },
     };
 
     #[test]
     fn should_generate_empty_record_impl() {
-        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
+        let mut builder = NativeRecordDefinitionBuilder::new(HostTypeResolver);
         builder.close_record_variant();
         let definition = builder.build();
 
@@ -226,9 +230,9 @@ impl<const CAP: usize> CappedRecord0<CAP> {
 
     #[test]
     fn should_generate_record_impl_with_data() {
-        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
-        builder.add_datum_allow_uninit::<u32, _>("integer");
-        builder.add_datum::<u32, _>("not_copy_integer");
+        let mut builder = NativeRecordDefinitionBuilder::new(HostTypeResolver);
+        builder.add_datum_allow_uninit::<u32, _>("integer").unwrap();
+        builder.add_datum::<u32, _>("not_copy_integer").unwrap();
         builder.close_record_variant();
         let definition = builder.build();
 
@@ -300,15 +304,21 @@ impl<const CAP: usize> CappedRecord0<CAP> {
 
     #[test]
     fn should_generate_next_record_impl_with_data() {
-        let mut builder = RecordDefinitionBuilder::new(HostTypeResolver);
-        let i0 = builder.add_datum_allow_uninit::<u32, _>("integer0");
-        let nci0 = builder.add_datum::<u32, _>("not_copy_integer0");
-        builder.add_datum_allow_uninit::<bool, _>("boolean1");
+        let mut builder = NativeRecordDefinitionBuilder::new(HostTypeResolver);
+        let i0 = builder
+            .add_datum_allow_uninit::<u32, _>("integer0")
+            .unwrap();
+        let nci0 = builder.add_datum::<u32, _>("not_copy_integer0").unwrap();
+        builder
+            .add_datum_allow_uninit::<bool, _>("boolean1")
+            .unwrap();
         builder.close_record_variant();
-        builder.remove_datum(i0);
-        builder.remove_datum(nci0);
-        builder.add_datum_allow_uninit::<u32, _>("integer1");
-        builder.add_datum::<u32, _>("not_copy_integer1");
+        builder.remove_datum(i0).unwrap();
+        builder.remove_datum(nci0).unwrap();
+        builder
+            .add_datum_allow_uninit::<u32, _>("integer1")
+            .unwrap();
+        builder.add_datum::<u32, _>("not_copy_integer1").unwrap();
         builder.close_record_variant();
         let definition = builder.build();
 

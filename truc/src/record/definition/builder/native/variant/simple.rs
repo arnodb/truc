@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 
-use super::{align_bytes, DataUpdater};
-use crate::record::definition::{DatumDefinition, DatumDefinitionCollection, DatumId};
+use super::{align_bytes, NativeDataUpdater};
+use crate::record::definition::{
+    DatumDefinition, DatumDefinitionCollection, DatumId, NativeDatumDetails,
+};
 
 #[derive(Debug)]
 struct Gap {
@@ -12,7 +14,7 @@ struct Gap {
 
 fn compute_initial_gaps(
     data: &[DatumId],
-    datum_definitions: &DatumDefinitionCollection,
+    datum_definitions: &DatumDefinitionCollection<NativeDatumDetails>,
 ) -> Vec<Gap> {
     let mut last_offset = 0;
     data.iter()
@@ -22,19 +24,19 @@ fn compute_initial_gaps(
                 .get(datum_id)
                 .unwrap_or_else(|| panic!("datum #{}", datum_id));
             // Ignore empty data
-            if datum.size() == 0 {
+            if datum.details().size() == 0 {
                 return None;
             }
-            if datum.offset > last_offset {
+            if datum.details().offset() > last_offset {
                 let gap = Gap {
                     start: last_offset,
-                    end: datum.offset,
+                    end: datum.details().offset(),
                     datum_index,
                 };
-                last_offset = datum.offset + datum.size();
+                last_offset = datum.details().offset() + datum.details().size();
                 Some(gap)
             } else {
-                last_offset = datum.offset + datum.size();
+                last_offset = datum.details().offset() + datum.details().size();
                 None
             }
         })
@@ -72,10 +74,10 @@ impl FittedDatum {
 fn fit_datum_to_gap(
     gap_index: usize,
     gap: &Gap,
-    datum: &DatumDefinition,
+    datum: &DatumDefinition<NativeDatumDetails>,
 ) -> Option<(FullGap, FittedDatum)> {
-    let datum_start = align_bytes(gap.start, datum.type_align());
-    let datum_end = datum_start + datum.size();
+    let datum_start = align_bytes(gap.start, datum.details().type_align());
+    let datum_end = datum_start + datum.details().size();
     if gap.end >= datum_end {
         let gap_before = datum_start - gap.start;
         let gap_after = gap.end - datum_end;
@@ -161,7 +163,7 @@ pub fn simple(
     mut data: Vec<DatumId>,
     data_to_add: Vec<DatumId>,
     data_to_remove: Vec<DatumId>,
-    datum_definitions: &mut DatumDefinitionCollection,
+    datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
 ) -> Vec<DatumId> {
     // Remove first to optimize space
 
@@ -178,7 +180,9 @@ pub fn simple(
             let datum = datum_definitions
                 .get(datum_id)
                 .unwrap_or_else(|| panic!("datum #{}", datum_id));
-            map.entry(datum.size()).or_default().push(datum_id);
+            map.entry(datum.details().size())
+                .or_default()
+                .push(datum_id);
         }
         map
     };
@@ -192,7 +196,7 @@ pub fn simple(
 
         for (gap_index, gap) in gaps.iter().enumerate() {
             // No room
-            if gap.end - gap.start < datum.size() {
+            if gap.end - gap.start < datum.details().size() {
                 continue;
             }
 
@@ -222,9 +226,11 @@ pub fn simple(
 
             let chosen = {
                 let mut iter = fitted.into_iter();
-                let first = select_start_or_end_of_gap(iter.next().unwrap(), datum.type_align());
+                let first =
+                    select_start_or_end_of_gap(iter.next().unwrap(), datum.details().type_align());
                 iter.fold(first, |prev, current| {
-                    let selected_current = select_start_or_end_of_gap(current, datum.type_align());
+                    let selected_current =
+                        select_start_or_end_of_gap(current, datum.details().type_align());
                     select_best(
                         prev.selection_value(),
                         || prev,
@@ -284,7 +290,7 @@ pub fn simple(
             let datum_mut = datum_definitions
                 .get_mut(datum_id)
                 .unwrap_or_else(|| panic!("datum #{}", datum_id));
-            datum_mut.offset = datum_start;
+            datum_mut.details_mut().offset = datum_start;
 
             let first_gap_after = match replace_gap_with {
                 Some((replace_with_gap, Some(and_gap))) => {
@@ -326,33 +332,38 @@ mod tests {
 
     use super::simple;
     use crate::record::{
-        definition::{builder::variant::align_bytes, DatumDefinitionCollection, DatumId},
+        definition::{
+            builder::native::variant::align_bytes, DatumDefinitionCollection, DatumId,
+            NativeDatumDetails,
+        },
         type_resolver::TypeInfo,
     };
 
     fn add<T: Copy>(
         name: &str,
         offset: usize,
-        datum_definitions: &mut DatumDefinitionCollection,
+        datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
     ) -> DatumId {
         if offset != usize::MAX {
             assert_eq!(align_bytes(offset, std::mem::align_of::<T>()), offset);
         }
         datum_definitions.push(
             name.to_owned(),
-            offset,
-            TypeInfo {
-                name: type_name::<T>().to_owned(),
-                size: std::mem::size_of::<T>(),
-                align: std::mem::align_of::<T>(),
-            },
-            true,
+            NativeDatumDetails::new(
+                offset,
+                TypeInfo {
+                    name: type_name::<T>().to_owned(),
+                    size: std::mem::size_of::<T>(),
+                    align: std::mem::align_of::<T>(),
+                },
+                true,
+            ),
         )
     }
 
     fn data_to_text<'a>(
         data: &[DatumId],
-        datum_definitions: &'a DatumDefinitionCollection,
+        datum_definitions: &'a DatumDefinitionCollection<NativeDatumDetails>,
     ) -> Vec<&'a str> {
         data.iter()
             .map(|&d| datum_definitions.get(d).unwrap().name())
@@ -391,7 +402,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id1).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g1", 16)
         );
@@ -403,7 +414,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id2).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             expected
         );
@@ -435,7 +446,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id1).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g1", 4)
         );
@@ -464,7 +475,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id1).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g1", 16)
         );
@@ -472,7 +483,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id2).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g2", 4)
         );

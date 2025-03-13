@@ -9,7 +9,9 @@ use self::{
     config::GeneratorConfig,
     fragment::{FragmentGeneratorSpecs, RecordGeneric, RecordSpec},
 };
-use crate::record::definition::{DatumDefinition, RecordDefinition, RecordVariant};
+use crate::record::definition::{
+    DatumDefinition, NativeDatumDetails, RecordDefinition, RecordVariant,
+};
 
 pub mod config;
 pub mod fragment;
@@ -18,7 +20,10 @@ const CAP_GENERIC: &str = "const CAP: usize";
 const CAP: &str = "CAP";
 
 /// Generates the code for the given record definition.
-pub fn generate(definition: &RecordDefinition, config: &GeneratorConfig) -> String {
+pub fn generate(
+    definition: &RecordDefinition<NativeDatumDetails>,
+    config: &GeneratorConfig,
+) -> String {
     let mut scope = Scope::new();
 
     scope.import("truc_runtime::data", "RecordMaybeUninit");
@@ -87,7 +92,7 @@ This is to be used in custom allocators."#,
 ///
 /// This function is exposed for testing purpose.
 pub fn generate_variant<'a>(
-    definition: &'a RecordDefinition,
+    definition: &'a RecordDefinition<NativeDatumDetails>,
     max_type_align: usize,
     variant: &'a RecordVariant,
     prev_record_spec: Option<&RecordSpec>,
@@ -135,7 +140,7 @@ pub fn generate_variant<'a>(
     };
 
     for datum in &record_spec.plus_data {
-        type_size_assertions.insert((datum.type_name(), datum.size()));
+        type_size_assertions.insert((datum.details().type_name(), datum.details().size()));
     }
 
     let specs = FragmentGeneratorSpecs {
@@ -168,12 +173,12 @@ enum UninitKind<'a> {
     },
 }
 
-fn safe_record_generic(data: &[&DatumDefinition]) -> Option<RecordGeneric> {
+fn safe_record_generic(data: &[&DatumDefinition<NativeDatumDetails>]) -> Option<RecordGeneric> {
     let mut generic = String::new();
     let mut short_generic = String::new();
     let mut typed_generic = String::new();
     for (index, datum) in data.iter().enumerate() {
-        if datum.allow_uninit() {
+        if datum.details().allow_uninit() {
             if !generic.is_empty() {
                 generic.push_str(", ");
                 short_generic.push_str(", ");
@@ -181,7 +186,7 @@ fn safe_record_generic(data: &[&DatumDefinition]) -> Option<RecordGeneric> {
             }
             generic.push_str(&format!("T{}: Copy", index));
             short_generic.push_str(&format!("T{}", index));
-            typed_generic.push_str(datum.type_name());
+            typed_generic.push_str(datum.details().type_name());
         }
     }
 
@@ -204,7 +209,7 @@ struct RecordInfo<'a> {
 
 fn generate_data_record(
     record_info: RecordInfo,
-    data: &[&DatumDefinition],
+    data: &[&DatumDefinition<NativeDatumDetails>],
     uninit: UninitKind,
     scope: &mut Scope,
 ) {
@@ -222,9 +227,12 @@ fn generate_data_record(
     }
 
     for (index, datum) in data.iter().enumerate() {
-        match (&uninit, datum.allow_uninit()) {
+        match (&uninit, datum.details().allow_uninit()) {
             (_, false) | (UninitKind::False, true) => {
-                record.field(&format!("pub {}", datum.name()), datum.type_name());
+                record.field(
+                    &format!("pub {}", datum.name()),
+                    datum.details().type_name(),
+                );
             }
             (UninitKind::Safe { .. }, true) => {
                 record.field(
@@ -253,7 +261,7 @@ fn generate_data_record(
         }
         from_impl.impl_trait(format!("From<{}>", unsafe_record_name));
 
-        let uninit_has_data = data.iter().any(|datum| !datum.allow_uninit());
+        let uninit_has_data = data.iter().any(|datum| !datum.details().allow_uninit());
 
         let from_fn = from_impl
             .new_fn("from")
@@ -265,7 +273,7 @@ fn generate_data_record(
         from_fn.line(format!(
             "Self {{ {} }}",
             data.iter()
-                .map(|datum| if !datum.allow_uninit() {
+                .map(|datum| if !datum.details().allow_uninit() {
                     format!("{}: from.{}", datum.name(), datum.name())
                 } else {
                     format!("{}: std::marker::PhantomData", datum.name())
@@ -278,7 +286,7 @@ fn generate_data_record(
 fn generate_data_out_record(
     record_info: RecordInfo,
     inside_record_name: &str,
-    data: &[&DatumDefinition],
+    data: &[&DatumDefinition<NativeDatumDetails>],
     scope: &mut Scope,
 ) {
     let record = scope
@@ -291,7 +299,10 @@ fn generate_data_out_record(
     record.field("pub record", inside_record_type);
 
     for datum in data {
-        record.field(&format!("pub {}", datum.name()), datum.type_name());
+        record.field(
+            &format!("pub {}", datum.name()),
+            datum.details().type_name(),
+        );
     }
 
     if let Some(doc) = record_info.doc {
@@ -312,7 +323,10 @@ mod tests {
     use crate::{
         generator::fragment::{clone::CloneImplGenerator, serde::SerdeImplGenerator},
         record::{
-            definition::{DatumDefinitionOverride, DatumId, RecordDefinitionBuilder},
+            definition::{
+                builder::native::{DatumDefinitionOverride, NativeRecordDefinitionBuilder},
+                DatumId,
+            },
             type_resolver::{StaticTypeResolver, TypeResolver},
         },
     };
@@ -326,10 +340,10 @@ mod tests {
     }
 
     fn add_one<R: TypeResolver>(
-        definition: &mut RecordDefinitionBuilder<R>,
+        definition: &mut NativeRecordDefinitionBuilder<R>,
         rng: &mut rand_chacha::ChaCha8Rng,
         i: usize,
-    ) -> DatumId {
+    ) -> Result<DatumId, String> {
         match rng.gen_range(0..7) {
             0 => definition.add_datum_allow_uninit::<u8, _>(format!("field_{}", i)),
             1 => definition.add_datum_allow_uninit::<u16, _>(format!("field_{}", i)),
@@ -363,10 +377,10 @@ mod tests {
 
         const MAX_DATA: usize = 32;
         for _ in 0..256 {
-            let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+            let mut definition = NativeRecordDefinitionBuilder::new(&type_resolver);
             let num_data = rng.gen_range(0..=MAX_DATA);
             let data = (0..num_data)
-                .map(|i| add_one(&mut definition, &mut rng, i))
+                .map(|i| add_one(&mut definition, &mut rng, i).unwrap())
                 .collect::<Vec<DatumId>>();
             definition.close_record_variant();
             let mut removed = BTreeSet::new();
@@ -374,12 +388,13 @@ mod tests {
                 let index = rng.gen_range(0..data.len());
                 if !removed.contains(&index) {
                     removed.insert(index);
-                    definition.remove_datum(data[index]);
+                    definition.remove_datum(data[index]).unwrap();
                 }
             }
             for i in 0..(num_data / 5) {
-                add_one(&mut definition, &mut rng, num_data + i);
+                add_one(&mut definition, &mut rng, num_data + i).unwrap();
             }
+            definition.close_record_variant();
             let def = definition.build();
             generate(
                 &def,

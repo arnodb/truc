@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, env, fs::File, io::Write, path::PathBuf};
 use truc::{
     generator::{config::GeneratorConfig, generate},
     record::{
-        definition::RecordDefinitionBuilder,
+        definition::builder::native::NativeRecordDefinitionBuilder,
         type_resolver::{DynamicTypeInfo, StaticTypeResolver},
     },
 };
@@ -86,23 +86,27 @@ fn main() {
 
     let type_resolver = build_type_resolver(&cross_compilation);
 
-    let mut definition = RecordDefinitionBuilder::new(&type_resolver);
+    let mut definition = NativeRecordDefinitionBuilder::new(&type_resolver);
 
     // We'll compute the fibonacci number iteratively
-    let fibo_iter_id = definition.add_datum_allow_uninit::<usize, _>("fibo_iter");
+    let fibo_iter_id = definition
+        .add_datum_allow_uninit::<usize, _>("fibo_iter")
+        .unwrap();
     definition.close_record_variant();
 
     // We'll also compute the fibonacci number by rounding
-    let fibo_rounding_id = definition.add_datum_allow_uninit::<usize, _>("fibo_rounding");
+    let fibo_rounding_id = definition
+        .add_datum_allow_uninit::<usize, _>("fibo_rounding")
+        .unwrap();
     definition.close_record_variant();
 
     // Remove the values
-    definition.remove_datum(fibo_iter_id);
-    definition.remove_datum(fibo_rounding_id);
+    definition.remove_datum(fibo_iter_id).unwrap();
+    definition.remove_datum(fibo_rounding_id).unwrap();
 
     // We'll write a boolean and a message
-    definition.add_datum_allow_uninit::<bool, _>("ok");
-    definition.add_datum::<String, _>("msg");
+    definition.add_datum_allow_uninit::<bool, _>("ok").unwrap();
+    definition.add_datum::<String, _>("msg").unwrap();
     definition.close_record_variant();
 
     let definition = definition.build();

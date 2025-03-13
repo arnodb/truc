@@ -1,11 +1,11 @@
-use super::DataUpdater;
-use crate::record::definition::{DatumDefinitionCollection, DatumId};
+use super::NativeDataUpdater;
+use crate::record::definition::{DatumDefinitionCollection, DatumId, NativeDatumDetails};
 
 pub fn append_data(
     mut data: Vec<DatumId>,
     data_to_add: Vec<DatumId>,
     data_to_remove: Vec<DatumId>,
-    datum_definitions: &mut DatumDefinitionCollection,
+    datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
 ) -> Vec<DatumId> {
     data.remove_data(data_to_remove.iter().cloned());
 
@@ -20,7 +20,7 @@ pub fn append_data_reverse(
     mut data: Vec<DatumId>,
     data_to_add: Vec<DatumId>,
     data_to_remove: Vec<DatumId>,
-    datum_definitions: &mut DatumDefinitionCollection,
+    datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
 ) -> Vec<DatumId> {
     data.remove_data(data_to_remove.iter().cloned());
 
@@ -38,33 +38,38 @@ mod tests {
 
     use super::{append_data, append_data_reverse};
     use crate::record::{
-        definition::{builder::variant::align_bytes, DatumDefinitionCollection, DatumId},
+        definition::{
+            builder::native::variant::align_bytes, DatumDefinitionCollection, DatumId,
+            NativeDatumDetails,
+        },
         type_resolver::TypeInfo,
     };
 
     fn add<T: Copy>(
         name: &str,
         offset: usize,
-        datum_definitions: &mut DatumDefinitionCollection,
+        datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,
     ) -> DatumId {
         if offset != usize::MAX {
             assert_eq!(align_bytes(offset, std::mem::align_of::<T>()), offset);
         }
         datum_definitions.push(
             name.to_owned(),
-            offset,
-            TypeInfo {
-                name: type_name::<T>().to_owned(),
-                size: std::mem::size_of::<T>(),
-                align: std::mem::align_of::<T>(),
-            },
-            true,
+            NativeDatumDetails::new(
+                offset,
+                TypeInfo {
+                    name: type_name::<T>().to_owned(),
+                    size: std::mem::size_of::<T>(),
+                    align: std::mem::align_of::<T>(),
+                },
+                true,
+            ),
         )
     }
 
     fn data_to_text<'a>(
         data: &[DatumId],
-        datum_definitions: &'a DatumDefinitionCollection,
+        datum_definitions: &'a DatumDefinitionCollection<NativeDatumDetails>,
     ) -> Vec<&'a str> {
         data.iter()
             .map(|&d| datum_definitions.get(d).unwrap().name())
@@ -99,7 +104,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id1).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g1", 32)
         );
@@ -111,7 +116,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id2).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             expected
         );
@@ -143,7 +148,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id1).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g1", 40)
         );
@@ -151,7 +156,7 @@ mod tests {
         assert_eq!(
             {
                 let datum = datum_definitions.get(new_id2).unwrap();
-                (datum.name(), datum.offset)
+                (datum.name(), datum.details().offset())
             },
             ("g2", 32)
         );
