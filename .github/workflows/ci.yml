@@ -49,6 +49,7 @@ jobs:
     with:
       target: i686-unknown-linux-gnu
       rust_toolchain: 1.65.0
+      pre_build_script: ./scripts/cross_msrv_pin_dependencies.sh
 
   cross_1_65_0_aarch64:
     name: Rust 1.65.0 aarch64-unknown-linux-gnu
@@ -56,4 +57,5 @@ jobs:
     with:
       target: aarch64-unknown-linux-gnu
       rust_toolchain: 1.65.0
+      pre_build_script: ./scripts/cross_msrv_pin_dependencies.sh
 
