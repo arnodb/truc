@@ -10,6 +10,7 @@ use itertools::Itertools;
 use crate::record::type_resolver::TypeInfo;
 
 pub mod builder;
+pub mod convert;
 
 /// Identifier of datums (elementary data in records).
 ///
