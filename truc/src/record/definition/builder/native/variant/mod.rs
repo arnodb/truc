@@ -1,3 +1,5 @@
+//! Building native record variants.
+
 use crate::record::definition::{DatumDefinitionCollection, DatumId, NativeDatumDetails};
 
 mod basic;
@@ -8,13 +10,19 @@ pub use basic::basic;
 pub use dummy::{append_data, append_data_reverse};
 pub use simple::simple;
 
+/// Extension trait for [`Vec<DatumId>`].
 pub trait NativeDataUpdater {
+    /// Finds the end offset boundary of the record variant.
+    ///
+    /// This is where datums can be appended.
     fn end(&self, datum_definitions: &DatumDefinitionCollection<NativeDatumDetails>) -> usize;
 
+    /// Removes a set of datums in one go.
     fn remove_data<I>(&mut self, datum_ids: I)
     where
         I: IntoIterator<Item = DatumId> + Clone;
 
+    /// Pushes a datum at the end of the record variant.
     fn push_datum(
         &mut self,
         datum_definitions: &mut DatumDefinitionCollection<NativeDatumDetails>,

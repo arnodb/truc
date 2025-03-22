@@ -11,6 +11,11 @@ use crate::record::type_resolver::TypeInfo;
 
 pub mod builder;
 
+/// Identifier of datums (elementary data in records).
+///
+/// It allows identifying a datum appearing in multiple consecutive variants of a record
+/// definition. Once a datum is removed from a variant, its identifier will never be readded to a
+/// later variant.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct DatumId(usize);
 
@@ -20,6 +25,9 @@ impl Debug for DatumId {
     }
 }
 
+/// Generic datum definition.
+///
+/// Use [NativeDatumDetails] as `D` for native datum definitions.
 #[derive(PartialEq, Eq, Debug, new)]
 pub struct DatumDefinition<D> {
     id: DatumId,
@@ -28,18 +36,30 @@ pub struct DatumDefinition<D> {
 }
 
 impl<D> DatumDefinition<D> {
+    /// Gets the identifier of this datum.
     pub fn id(&self) -> DatumId {
         self.id
     }
 
+    /// Gets the datum name.
+    ///
+    /// A datum name may appear only once in a record variant. It can be used to identify a datum
+    /// in a specific variant. Lookup functions are exposed in the various builders.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Gets the details of that datum.
+    ///
+    /// In the case of native definitions, various Rust type related data is stored there. See
+    /// [NativeDatumDetails].
     pub fn details(&self) -> &D {
         &self.details
     }
 
+    /// Gets mutable access to the details of that datum.
+    ///
+    /// See [details](Self::details).
     pub fn details_mut(&mut self) -> &mut D {
         &mut self.details
     }
@@ -52,6 +72,7 @@ impl<D: Display> Display for DatumDefinition<D> {
     }
 }
 
+/// Container for datum definitions.
 #[derive(Debug)]
 pub struct DatumDefinitionCollection<D> {
     data: Vec<DatumDefinition<D>>,
@@ -70,11 +91,13 @@ impl<D> DatumDefinitionCollection<D> {
         self.data.iter()
     }
 
-    fn get(&self, id: DatumId) -> Option<&DatumDefinition<D>> {
+    /// Gets a datum definition by ID.
+    pub fn get(&self, id: DatumId) -> Option<&DatumDefinition<D>> {
         self.data.get(id.0)
     }
 
-    fn get_mut(&mut self, id: DatumId) -> Option<&mut DatumDefinition<D>> {
+    /// Gets a mutable access to a datum definition by ID.
+    pub fn get_mut(&mut self, id: DatumId) -> Option<&mut DatumDefinition<D>> {
         self.data.get_mut(id.0)
     }
 
@@ -86,9 +109,11 @@ impl<D> DatumDefinitionCollection<D> {
     }
 }
 
+/// Identifier of record variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Display, From)]
 pub struct RecordVariantId(usize);
 
+/// Record variant definition.
 #[derive(PartialEq, Eq, Debug, new)]
 pub struct RecordVariant {
     id: RecordVariantId,
@@ -96,18 +121,31 @@ pub struct RecordVariant {
 }
 
 impl RecordVariant {
+    /// Gets the identifier of this variant.
     pub fn id(&self) -> RecordVariantId {
         self.id
     }
 
+    /// Gets access to record data in an internal order.
+    ///
+    /// In the case of native definitions, the order matches the order in memory and is different
+    /// from the order of insertion of data.
+    ///
+    /// See [data_sorted](Self::data_sorted).
     pub fn data(&self) -> impl Iterator<Item = DatumId> + '_ {
         self.data.iter().copied()
     }
 
+    /// Gets access to record data in the order of insertion.
+    ///
+    /// See [data](Self::data).
     pub fn data_sorted(&self) -> impl Iterator<Item = DatumId> + '_ {
+        // Since datum IDs are generated with a sequence, it's enough to sort by ID to achieve
+        // "order of insertion".
         self.data.iter().copied().sorted()
     }
 
+    /// Gets the number of datums in the variant.
     pub fn data_len(&self) -> usize {
         self.data.len()
     }
@@ -129,6 +167,9 @@ impl Display for RecordVariant {
     }
 }
 
+/// Record definition structure.
+///
+/// It is the output of record definition builders (see [builder]).
 #[derive(Debug)]
 pub struct RecordDefinition<D> {
     datum_definitions: DatumDefinitionCollection<D>,
@@ -136,18 +177,22 @@ pub struct RecordDefinition<D> {
 }
 
 impl<D> RecordDefinition<D> {
+    /// Gets an iterator on all datum definitions.
     pub fn datum_definitions(&self) -> impl Iterator<Item = &DatumDefinition<D>> {
         self.datum_definitions.iter()
     }
 
+    /// Gets a datum definition by ID.
     pub fn get_datum_definition(&self, id: DatumId) -> Option<&DatumDefinition<D>> {
         self.datum_definitions.get(id)
     }
 
+    /// Gets an iterator on all record variants.
     pub fn variants(&self) -> impl Iterator<Item = &RecordVariant> {
         self.variants.iter()
     }
 
+    /// Gets a variant definition by ID.
     pub fn get_variant(&self, id: RecordVariantId) -> Option<&RecordVariant> {
         self.variants.get(id.0)
     }
@@ -171,6 +216,7 @@ impl<D> Index<RecordVariantId> for RecordDefinition<D> {
     }
 }
 
+/// Rust native datum details to use as generic in [RecordDefinition].
 #[derive(PartialEq, Eq, Debug, new)]
 pub struct NativeDatumDetails {
     offset: usize,
@@ -190,32 +236,41 @@ impl Display for NativeDatumDetails {
 }
 
 impl NativeDatumDetails {
+    /// Gets the offset of this datum in the record buffer.
     pub fn offset(&self) -> usize {
         self.offset
     }
 
+    /// Gets the size of this datum in the record buffer.
     pub fn size(&self) -> usize {
         self.type_info.size
     }
 
+    /// Gets the type information of this datum.
     pub fn type_info(&self) -> &TypeInfo {
         &self.type_info
     }
 
+    /// Gets the type name of this datum.
     pub fn type_name(&self) -> &str {
         &self.type_info.name
     }
 
+    /// Gets the type alignment of this datum.
     pub fn type_align(&self) -> usize {
         self.type_info.align
     }
 
+    /// Gets the type `allow_uninit` flag of this datum.
     pub fn allow_uninit(&self) -> bool {
         self.allow_uninit
     }
 }
 
 impl RecordDefinition<NativeDatumDetails> {
+    /// Gets the maximum value of type alignment in the definition.
+    ///
+    /// It is used to determine the alignment of the record structure.
     pub fn max_type_align(&self) -> usize {
         self.datum_definitions()
             .map(|d| d.details().type_align())
@@ -223,6 +278,10 @@ impl RecordDefinition<NativeDatumDetails> {
             .unwrap_or(std::mem::align_of::<()>())
     }
 
+    /// Gets the maximum size of all record variants.
+    ///
+    /// This is used to determine the size of the byte buffer required to store any variant of this
+    /// record definition.
     pub fn max_size(&self) -> usize {
         self.datum_definitions()
             .map(|d| d.details().offset() + d.details().size())

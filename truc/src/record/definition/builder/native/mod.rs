@@ -1,3 +1,9 @@
+//! Implementation of native (Rust) record definition builder.
+//!
+//! It requires a [TypeResolver] in its generic type definition which could make it impractical
+//! when the type is used in many layers of the domain logic. In such a case the builder at
+//! [generic](super::generic) is a better choice.
+
 use std::ops::Index;
 
 use super::generic::{variant::RecordVariantBuilder, GenericRecordDefinitionBuilder};
@@ -11,6 +17,17 @@ use crate::record::{
 
 pub mod variant;
 
+/// Main structure to start building native record definitions.
+///
+/// [NativeRecordDefinitionBuilder] can be used to build native record definitions and then
+/// generate Rust code for all variants.
+///
+/// When the Rust code generator is not required, [GenericRecordDefinitionBuilder] is a better
+/// choice.
+///
+/// They both behave the same except that the native implementation can order datums in an
+/// optimized way in regards of Rust type alignment and size constraints. This is why the native
+/// record definitions are the only ones allowing code generation.
 pub struct NativeRecordDefinitionBuilder<R>
 where
     R: TypeResolver,
@@ -230,10 +247,15 @@ where
     }
 }
 
+/// Optional overrides for [NativeRecordDefinitionBuilder::add_datum_override].
 pub struct DatumDefinitionOverride {
+    /// Use it to override the type name.
     pub type_name: Option<String>,
+    /// Use it to override the type size.
     pub size: Option<usize>,
+    /// Use it to override the type alignment.
     pub align: Option<usize>,
+    /// Use it to override the `allow_uninit` flag.
     pub allow_uninit: Option<bool>,
 }
 

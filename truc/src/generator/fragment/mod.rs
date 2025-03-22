@@ -14,6 +14,9 @@ pub(crate) mod record;
 pub(crate) mod record_impl;
 pub mod serde;
 
+/// Trait to implement to implement any specific fragment of record definitions.
+///
+/// See [GeneratorConfig](crate::generator::config::GeneratorConfig).
 pub trait FragmentGenerator {
     fn imports(&self, _scope: &mut Scope) {}
 

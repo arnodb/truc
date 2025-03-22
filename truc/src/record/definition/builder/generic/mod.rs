@@ -1,3 +1,8 @@
+//! Implementation of shared record definition builder behaviours.
+//!
+//! This implementation is generic as opposed to the one in [native](super::native) which requires
+//! a type resolver in its generic definition.
+
 use std::ops::Index;
 
 use variant::RecordVariantBuilder;
@@ -9,7 +14,14 @@ use crate::record::definition::{
 
 pub mod variant;
 
-/// Main structure to start building record definitions.
+/// Main structure to start building generic record definitions.
+///
+/// [GenericRecordDefinitionBuilder] can be used to build abstract record definitions when the Rust
+/// code generator is not yet necessary.
+///
+/// When the Rust code generator is required, one has only to replay the build process with a
+/// [NativeRecordDefinitionBuilder](super::native::NativeRecordDefinitionBuilder) and perform ID
+/// mapping.
 pub struct GenericRecordDefinitionBuilder<D> {
     datum_definitions: DatumDefinitionCollection<D>,
     variants: Vec<RecordVariant>,
@@ -141,6 +153,9 @@ impl<D> GenericRecordDefinitionBuilder<D> {
         })
     }
 
+    /// Gets the IDs of the data present in the current variant.
+    ///
+    /// It takes the removed and added data into account even when the variant is not closed yet.
     pub fn get_current_data(&self) -> impl Iterator<Item = DatumId> + '_ {
         self.variants
             .last()

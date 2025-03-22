@@ -216,11 +216,15 @@ impl StaticTypeResolver {
         add_type_and_arrays!(self, Vec<()>);
     }
 
+    /// Adds `Uuid` types to the data.
     #[cfg(feature = "uuid")]
     pub fn add_uuid_types(&mut self) {
         add_type_and_arrays!(self, uuid::Uuid, allow_uninit);
     }
 
+    /// Adds all known types to the data.
+    ///
+    /// Basically all standard types plus feature gated types like `Uuid` types.
     pub fn add_all_types(&mut self) {
         self.add_std_types();
         #[cfg(feature = "uuid")]

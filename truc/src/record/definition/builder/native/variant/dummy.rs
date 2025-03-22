@@ -1,6 +1,7 @@
 use super::NativeDataUpdater;
 use crate::record::definition::{DatumDefinitionCollection, DatumId, NativeDatumDetails};
 
+/// Record variant builder that simply removes data and appends data at the end of the record.
 pub fn append_data(
     mut data: Vec<DatumId>,
     data_to_add: Vec<DatumId>,
@@ -16,6 +17,10 @@ pub fn append_data(
     data
 }
 
+/// Record variant builder that simply removes data and appends data in "reverse" order at the end
+/// of the record.
+///
+/// Useful to simulate fuzzing.
 pub fn append_data_reverse(
     mut data: Vec<DatumId>,
     data_to_add: Vec<DatumId>,
