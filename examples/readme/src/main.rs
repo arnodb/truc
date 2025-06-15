@@ -12,7 +12,6 @@ fn main() {
     use crate::truc::*;
 
     for record_2 in (0..42)
-        .into_iter()
         .map(|integer| Record0::new(UnpackedRecord0 { integer }))
         .map(|mut record_0| {
             (*record_0.integer_mut()) *= 2;

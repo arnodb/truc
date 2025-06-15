@@ -7,8 +7,6 @@ members = [
     "examples/fibonacci",
     "examples/machin/data",
     "examples/machin/machin",
+    "examples/readme",
     "internal/truc_analyzer",
-]
-exclude = [
-    "examples/readme"
 ]

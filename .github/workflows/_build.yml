@@ -86,6 +86,10 @@ jobs:
         name: Compile and run tests
         run: cargo test ${{ inputs.rust_features }} --verbose
 
+      - id: run-readme
+        name: Run the "readme" example
+        run: cargo run -p readme
+
       - id: run-fibonacci
         name: Run the "fibonacci" example
         run: cargo run -p fibonacci
