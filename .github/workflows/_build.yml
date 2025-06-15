@@ -22,6 +22,10 @@ on:
         required: false
         type: boolean
         default: false
+      with_asm_tests:
+        required: false
+        type: boolean
+        default: false
       pre_build_script:
         required: false
         type: string
@@ -98,3 +102,9 @@ jobs:
         name: Run the "machin" example
         run: cargo run -p machin
 
+      - id: run-asm-tests
+        name: Run ASM tests
+        if: ${{ inputs.with_asm_tests }}
+        run: |
+          cargo quickinstall cargo-show-asm
+          ./scripts/asm_test.sh
