@@ -8,6 +8,7 @@ members = [
     "examples/machin/data",
     "examples/machin/machin",
     "internal/truc_analyzer",
+    "asm_tests/truc_asm_1",
 ]
 exclude = [
     "examples/readme"

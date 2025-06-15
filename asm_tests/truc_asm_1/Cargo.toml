@@ -1,0 +1,12 @@
+[package]
+name = "truc_asm_1"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+static_assertions = "1"
+truc_runtime = { path = "../../truc_runtime" }
+
+[build-dependencies]
+serde_json = "1"
+truc = { path = "../../truc" }
