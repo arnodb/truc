@@ -14,6 +14,9 @@ test *args:
 test_msrv:
     cargo test --features msrv
 
+asm_tests:
+    ./scripts/asm_test.sh
+
 check_all:
     just stable
     cargo clippy --all-features --all-targets -- -D warnings
@@ -27,6 +30,9 @@ check_all:
     just nightly
     cargo build --all-features
     cargo test --all-features
+
+    just stable
+    ./scripts/asm_test.sh
 
 # Toolchain management
 
