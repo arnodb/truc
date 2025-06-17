@@ -227,6 +227,43 @@ mod tests {
     }
 
     #[test]
+    fn test_drops_on_error() {
+        let dropped1 = Arc::new(AtomicUsize::new(0));
+        let dropped2 = Arc::new(AtomicUsize::new(0));
+
+        let mut input = Vec::new();
+        for value in 0..32 {
+            input.push(CountDrop1 {
+                value,
+                dropped: dropped1.clone(),
+            });
+        }
+
+        let err = std::panic::catch_unwind(|| {
+            try_convert_vec_in_place::<CountDrop1, CountDrop1000, _, _>(input, |rec, _| {
+                if rec.value == 23 {
+                    Err(())
+                } else if rec.value % 4 == 0 {
+                    Ok(VecElementConversionResult::Converted(CountDrop1000 {
+                        value: rec.value,
+                        dropped: dropped2.clone(),
+                    }))
+                } else {
+                    Ok(VecElementConversionResult::Abandonned)
+                }
+            })
+        })
+        .unwrap();
+        assert!(err.is_err());
+
+        // All 1s are dropped
+        assert_eq!(dropped1.load(Ordering::Relaxed), 32);
+
+        // All 6 (only) converted 2s are dropped
+        assert_eq!(dropped2.load(Ordering::Relaxed), 6000);
+    }
+
+    #[test]
     fn test_drops_on_panic() {
         let dropped1 = Arc::new(AtomicUsize::new(0));
         let dropped2 = Arc::new(AtomicUsize::new(0));
