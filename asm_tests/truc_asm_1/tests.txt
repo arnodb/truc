@@ -1,1 +1,3 @@
 should_convert_with_noop
+should_convert_vec_with_noop
+should_convert_vec_one_to_one_with_noop

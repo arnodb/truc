@@ -5,6 +5,7 @@ set -eu
 BASENAME=$(basename "$0")
 
 MODE=
+FILTERS=
 
 usage() {
     echo "$BASENAME -s|--snapshot [FILTER ...]"
@@ -46,10 +47,8 @@ while [ $# -gt 0 ]; do
             exit 1
             ;;
         *)
-            echo "Unexpected positional argument" > /dev/stderr
-            echo > /dev/stderr
-            usage > /dev/stderr
-            exit 1
+            FILTERS="$FILTERS $1"
+            shift
             ;;
     esac
 done
@@ -63,14 +62,28 @@ RESULT=0
 for PACKAGE in $PACKAGES
 do
     PACKAGE_PATH="asm_tests/$PACKAGE"
-    TESTS="$(cat "asm_tests/$PACKAGE/tests.txt")"
+    TESTS="$(sort -u < "asm_tests/$PACKAGE/tests.txt")"
+    if [ -n "$FILTERS" ]
+    then
+        TESTS=$(
+            (
+                for t in $TESTS
+                do
+                    for f in $FILTERS
+                    do
+                        echo "$t" | grep -F "$f"
+                    done
+                done
+            ) | sort -u
+        )
+    fi
     case "$MODE" in
         TEST)
             for t in $TESTS
             do
                 echo "$MODE: $PACKAGE / $t"
-                cargo asm -p "$PACKAGE" --bin "$PACKAGE" "$t" --llvm >| "$PACKAGE_PATH/$t.llvm"
-                if diff -u "$PACKAGE_PATH/$t.llvm.snap" "$PACKAGE_PATH/$t.llvm"
+                cargo asm -p "$PACKAGE" --features "$t" --bin "$PACKAGE" "$t" --asm >| "$PACKAGE_PATH/$t.asm"
+                if diff -u "$PACKAGE_PATH/$t.asm.snap" "$PACKAGE_PATH/$t.asm"
                 then
                     echo "$PACKAGE / $t ok."
                 else
@@ -83,7 +96,7 @@ do
             for t in $TESTS
             do
                 echo "$MODE: $PACKAGE / $t"
-                cargo asm -p "$PACKAGE" --bin "$PACKAGE" "$t" --llvm >| "$PACKAGE_PATH/$t.llvm.snap"
+                cargo asm -p "$PACKAGE" --features "$t" --bin "$PACKAGE" "$t" --asm >| "$PACKAGE_PATH/$t.asm.snap"
             done
             ;;
         *)
