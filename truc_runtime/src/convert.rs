@@ -119,7 +119,7 @@ where
             Ok(())
         }));
 
-    let clean_on_error = || {
+    fn clean_on_error<T, U>(slice: &mut [T], first_moved: usize, first_ttt: usize) {
         // Bring Us back into auto-drop land
         for element in &slice[0..first_moved] {
             let mut uuu = MaybeUninit::<U>::uninit();
@@ -136,7 +136,7 @@ where
                 ttt.assume_init();
             }
         }
-    };
+    }
 
     match maybe_panic {
         Ok(Ok(())) => {
@@ -148,11 +148,11 @@ where
             })
         }
         Ok(Err(err)) => {
-            clean_on_error();
+            clean_on_error::<T, U>(slice, first_moved, first_ttt);
             Err(err)
         }
         Err(err) => {
-            clean_on_error();
+            clean_on_error::<T, U>(slice, first_moved, first_ttt);
             panic!("{:?}", err);
         }
     }
