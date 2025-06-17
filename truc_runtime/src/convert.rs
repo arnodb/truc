@@ -26,6 +26,13 @@ where
     try_convert_vec_in_place(input, |t, u| -> Result<_, ()> { Ok(convert(t, u)) }).unwrap()
 }
 
+pub fn convert_vec_in_place_one_to_one<T, U, C>(input: Vec<T>, convert: C) -> Vec<U>
+where
+    C: Fn(T) -> U + std::panic::RefUnwindSafe,
+{
+    try_convert_vec_in_place_one_to_one(input, |t| -> Result<_, ()> { Ok(convert(t)) }).unwrap()
+}
+
 /// Converts a vector of `T` to a vector of `U` where `T` and `U` have the same size in memory and
 /// the same alignment rule according to the Rust compiler.
 ///
@@ -143,6 +150,115 @@ where
             unsafe {
                 manually_drop.set_len(first_moved);
             }
+            Ok(unsafe {
+                std::mem::transmute::<Vec<T>, Vec<U>>(ManuallyDrop::into_inner(manually_drop))
+            })
+        }
+        Ok(Err(err)) => {
+            clean_on_error::<T, U>(slice, first_moved, first_ttt);
+            Err(err)
+        }
+        Err(err) => {
+            clean_on_error::<T, U>(slice, first_moved, first_ttt);
+            panic!("{:?}", err);
+        }
+    }
+}
+
+pub fn try_convert_vec_in_place_one_to_one<T, U, C, E>(
+    input: Vec<T>,
+    convert: C,
+) -> Result<Vec<U>, E>
+where
+    C: Fn(T) -> Result<U, E> + std::panic::RefUnwindSafe,
+{
+    // It would be nice to assert that statically. We could use a trait that indicates the
+    // invariant but this would have two drawbacks:
+    //
+    // - you have to trust the implementations of the trait
+    // - this would prevent from allowing conversions from any type T to any other type U where
+    // they both have the same memory layout
+    //
+    // Side note: those runtime assertions are optimised statically: either code without
+    // assertion code (the happy path), or pure panic (the incorrect path).
+    assert_eq!(
+        std::mem::size_of::<T>(),
+        std::mem::size_of::<U>(),
+        "size_of {} vs {}",
+        type_name::<T>(),
+        type_name::<U>()
+    );
+    assert_eq!(
+        std::mem::align_of::<T>(),
+        std::mem::align_of::<U>(),
+        "align_of {} vs {}",
+        type_name::<T>(),
+        type_name::<U>()
+    );
+
+    // Let's take control, we know what we're doing
+    let mut manually_drop = ManuallyDrop::new(input);
+    let slice = manually_drop.as_mut_slice();
+
+    // From now on, slice is divided into 3 areas:
+    //
+    // - 0..first_moved: elements of type U (to be dropped by the panic handler)
+    // - first_moved..first_ttt: dropped elements
+    // - first_ttt..: elements of type T (to be dropped by the panic handler)
+    //
+    // This must remain true until the end so that the panic handler drops elements correctly.
+    let mut first_moved = 0;
+    let mut first_ttt = 0;
+
+    let maybe_panic =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<(), E> {
+            while first_ttt < slice.len() {
+                // Bring one T back into auto-drop land
+                let ttt = {
+                    let mut ttt = MaybeUninit::<T>::uninit();
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(&slice[first_ttt], ttt.as_mut_ptr(), 1);
+                    }
+                    // The element in the slice is now moved
+                    first_ttt += 1;
+                    unsafe { ttt.assume_init() }
+                };
+
+                // Convert it
+                let uuu = convert(ttt)?;
+
+                // Store the result
+                unsafe {
+                    std::ptr::write((&mut slice[first_moved] as *mut T).cast(), uuu);
+                }
+                // The element is now converted
+                first_moved += 1;
+            }
+            Ok(())
+        }));
+
+    fn clean_on_error<T, U>(slice: &mut [T], first_moved: usize, first_ttt: usize) {
+        // Bring Us back into auto-drop land
+        for element in &slice[0..first_moved] {
+            let mut uuu = MaybeUninit::<U>::uninit();
+            unsafe {
+                std::ptr::copy_nonoverlapping(&*(element as *const T).cast(), uuu.as_mut_ptr(), 1);
+                uuu.assume_init();
+            }
+        }
+        // Bring Ts back into auto-drop land
+        for element in &slice[first_ttt..slice.len()] {
+            let mut ttt = MaybeUninit::<T>::uninit();
+            unsafe {
+                std::ptr::copy_nonoverlapping(element, ttt.as_mut_ptr(), 1);
+                ttt.assume_init();
+            }
+        }
+    }
+
+    match maybe_panic {
+        Ok(Ok(())) => {
+            debug_assert_eq!(manually_drop.len(), first_moved);
             Ok(unsafe {
                 std::mem::transmute::<Vec<T>, Vec<U>>(ManuallyDrop::into_inner(manually_drop))
             })
@@ -297,5 +413,106 @@ mod tests {
 
         // All 6 (only) converted 2s are dropped
         assert_eq!(dropped2.load(Ordering::Relaxed), 6000);
+    }
+
+    #[test]
+    fn test_one_to_one_drop_all_input_and_output() {
+        let dropped1 = Arc::new(AtomicUsize::new(0));
+        let dropped2 = Arc::new(AtomicUsize::new(0));
+
+        let mut input = Vec::new();
+        for value in 0..32 {
+            input.push(CountDrop1 {
+                value,
+                dropped: dropped1.clone(),
+            });
+        }
+
+        let output =
+            convert_vec_in_place_one_to_one::<CountDrop1, CountDrop1000, _>(input, |rec| {
+                CountDrop1000 {
+                    value: rec.value,
+                    dropped: dropped2.clone(),
+                }
+            });
+
+        assert_eq!(output.len(), 32);
+
+        // All 1s are dropped
+        assert_eq!(dropped1.load(Ordering::Relaxed), 32);
+
+        drop(output);
+
+        // All converted 2s are dropped
+        assert_eq!(dropped2.load(Ordering::Relaxed), 32000);
+    }
+
+    #[test]
+    fn test_one_to_one_drops_on_error() {
+        let dropped1 = Arc::new(AtomicUsize::new(0));
+        let dropped2 = Arc::new(AtomicUsize::new(0));
+
+        let mut input = Vec::new();
+        for value in 0..32 {
+            input.push(CountDrop1 {
+                value,
+                dropped: dropped1.clone(),
+            });
+        }
+
+        let err = std::panic::catch_unwind(|| {
+            try_convert_vec_in_place_one_to_one::<CountDrop1, CountDrop1000, _, _>(input, |rec| {
+                if rec.value == 23 {
+                    Err(())
+                } else {
+                    Ok(CountDrop1000 {
+                        value: rec.value,
+                        dropped: dropped2.clone(),
+                    })
+                }
+            })
+        })
+        .unwrap();
+        assert!(err.is_err());
+
+        // All 1s are dropped
+        assert_eq!(dropped1.load(Ordering::Relaxed), 32);
+
+        // All 23 (only) converted 2s are dropped
+        assert_eq!(dropped2.load(Ordering::Relaxed), 23000);
+    }
+
+    #[test]
+    fn test_one_to_one_drops_on_panic() {
+        let dropped1 = Arc::new(AtomicUsize::new(0));
+        let dropped2 = Arc::new(AtomicUsize::new(0));
+
+        let mut input = Vec::new();
+        for value in 0..32 {
+            input.push(CountDrop1 {
+                value,
+                dropped: dropped1.clone(),
+            });
+        }
+
+        let panic = std::panic::catch_unwind(|| {
+            convert_vec_in_place_one_to_one::<CountDrop1, CountDrop1000, _>(input, |rec| {
+                if rec.value == 23 {
+                    panic!("boom");
+                } else {
+                    CountDrop1000 {
+                        value: rec.value,
+                        dropped: dropped2.clone(),
+                    }
+                }
+            })
+        });
+        assert!(panic.is_err());
+
+        // All 1s are dropped
+        assert_eq!(dropped1.load(Ordering::Relaxed), 32);
+
+        // All 23 (only) converted 2s are dropped
+        assert_eq!(dropped2.load(Ordering::Relaxed), 23000);
     }
 }

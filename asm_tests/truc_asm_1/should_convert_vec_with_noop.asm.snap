@@ -1,0 +1,38 @@
+.section .text.should_convert_vec_with_noop,"ax",@progbits
+	.globl	should_convert_vec_with_noop
+	.p2align	4
+.type	should_convert_vec_with_noop,@function
+should_convert_vec_with_noop:
+	.cfi_startproc
+	mov rax, qword ptr [rsi]
+	mov rcx, qword ptr [rsi + 8]
+	mov rdx, qword ptr [rsi + 16]
+	cmp rdx, 2
+	jb .LBB6_3
+	lea rsi, [rdx - 2]
+	cmp rdx, rsi
+	mov r8, rsi
+	cmovb r8, rdx
+	cmp rsi, r8
+	jne .LBB6_2
+.LBB6_3:
+	mov rsi, rax
+	neg rsi
+	jo .LBB6_5
+	mov qword ptr [rdi], rax
+	mov qword ptr [rdi + 8], rcx
+	mov qword ptr [rdi + 16], rdx
+	mov rax, rdi
+	ret
+	.p2align	4
+.LBB6_2:
+	jmp .LBB6_2
+.LBB6_5:
+	push rax
+	.cfi_def_cfa_offset 16
+	lea rdi, [rip + .Lanon.76cbd883a681362e3f5caef3c5c31b76.5]
+	lea rcx, [rip + .Lanon.76cbd883a681362e3f5caef3c5c31b76.4]
+	lea r8, [rip + .Lanon.76cbd883a681362e3f5caef3c5c31b76.1]
+	lea rdx, [rsp + 7]
+	mov esi, 43
+	call qword ptr [rip + core::result::unwrap_failed@GOTPCREL]

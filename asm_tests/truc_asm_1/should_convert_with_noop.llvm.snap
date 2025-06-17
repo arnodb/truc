@@ -1,4 +1,0 @@
-define dso_local i64 @should_convert_with_noop(i64 returned %0) unnamed_addr #3 {
-start:
-  ret i64 %0
-}

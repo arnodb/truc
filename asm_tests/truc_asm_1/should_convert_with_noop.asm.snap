@@ -1,0 +1,8 @@
+.section .text.should_convert_with_noop,"ax",@progbits
+	.globl	should_convert_with_noop
+	.p2align	4
+.type	should_convert_with_noop,@function
+should_convert_with_noop:
+	.cfi_startproc
+	mov rax, rdi
+	ret

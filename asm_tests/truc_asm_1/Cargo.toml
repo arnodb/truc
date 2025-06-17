@@ -7,6 +7,12 @@ edition = "2021"
 static_assertions = "1"
 truc_runtime = { path = "../../truc_runtime" }
 
+[features]
+default = []
+should_convert_with_noop = []
+should_convert_vec_with_noop = []
+should_convert_vec_one_to_one_with_noop = []
+
 [build-dependencies]
 serde_json = "1"
 truc = { path = "../../truc" }
