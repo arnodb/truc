@@ -86,6 +86,7 @@ do
                 if diff -u "$PACKAGE_PATH/$t.asm.snap" "$PACKAGE_PATH/$t.asm"
                 then
                     echo "$PACKAGE / $t ok."
+                    rm "$PACKAGE_PATH/$t.asm"
                 else
                     echo "$PACKAGE / $t FAILED!!!"
                     RESULT=1
