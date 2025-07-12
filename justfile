@@ -8,14 +8,11 @@ clippy:
 watch_clippy:
     cargo watch -x "clippy --all-features --all-targets -- -D warnings"
 
-test:
-    cargo test --all-features
+test *args:
+    cargo test --all-features {{args}}
 
 test_msrv:
     cargo test --features msrv
-
-asm_tests:
-    ./scripts/asm_test.sh
 
 check_all:
     just stable
@@ -30,9 +27,6 @@ check_all:
     just nightly
     cargo build --all-features
     cargo test --all-features
-
-    just stable
-    ./scripts/asm_test.sh
 
 # Toolchain management
 
@@ -53,4 +47,9 @@ fmt:
 fmt_nightly:
     just nightly
     cargo fmt
+
+# Examples
+
+run_example example *args:
+    cargo run -p $(basename {{example}}) {{args}}
 
