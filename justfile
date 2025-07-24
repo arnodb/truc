@@ -2,6 +2,12 @@ export RUST_BACKTRACE := "1"
 
 # Build
 
+build:
+    cargo build --all-features --all-targets
+
+watch_build:
+    cargo watch -x "build --all-features --all-targets"
+
 clippy:
     cargo clippy --all-features --all-targets -- -D warnings
 
