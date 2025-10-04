@@ -12,6 +12,7 @@ cargo update -p libc --precise 0.2.163
 cargo update -p libm --precise 0.2.9
 cargo update -p os_str_bytes --precise 6.1.0
 cargo update -p textwrap --precise 0.16.1
+cargo update -p quote --precise 1.0.40
 
 cd examples/readme
 

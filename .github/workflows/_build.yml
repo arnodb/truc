@@ -25,9 +25,6 @@ on:
       pre_build_script:
         required: false
         type: string
-      post_build_script:
-        required: false
-        type: string
 
 env:
   CARGO_TERM_COLOR: always
