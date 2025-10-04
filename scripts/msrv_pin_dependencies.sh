@@ -18,6 +18,7 @@ cd examples/readme
 
 cargo update -p derive_more --precise 0.99.17
 cargo update -p either --precise 1.13.0
+cargo update -p quote --precise 1.0.40
 
 cd -
 

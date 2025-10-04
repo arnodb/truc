@@ -25,14 +25,17 @@ check_all:
     cargo clippy --all-features --all-targets -- -D warnings
     cargo build --all-features
     cargo test --all-features
+    cd examples/readme && cargo clippy --all-features --all-targets -- -D warnings
 
     just msrv
     cargo build --features msrv
     cargo test --features msrv
+    cd examples/readme && cargo build
 
     just nightly
     cargo build --all-features
     cargo test --all-features
+    cd examples/readme && cargo build
 
     just stable
 

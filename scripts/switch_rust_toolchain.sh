@@ -73,6 +73,7 @@ done
 
 echo "Removing \`Cargo.lock\`..."
 rm -f "$WORKSPACE_DIR/Cargo.lock"
+rm -f "$WORKSPACE_DIR/examples/readme/Cargo.lock"
 
 if [ x"$RUST_TOOLCHAIN" = x ]
 then
