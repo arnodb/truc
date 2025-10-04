@@ -34,6 +34,8 @@ check_all:
     cargo build --all-features
     cargo test --all-features
 
+    just stable
+
 # Toolchain management
 
 stable:
