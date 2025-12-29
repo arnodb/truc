@@ -17,6 +17,8 @@ impl CloneImplGenerator {
             .target_generic(CAP)
             .impl_trait("Clone");
 
+        let has_data = !record_spec.data.is_empty();
+
         {
             let clone_fn = clone_impl.new_fn("clone").arg_ref_self().ret("Self");
             clone_fn.line(format!(
@@ -41,7 +43,7 @@ impl CloneImplGenerator {
             let clone_from_fn = clone_impl
                 .new_fn("clone_from")
                 .arg_mut_self()
-                .arg("source", "&Self");
+                .arg(if has_data { "source" } else { "_source" }, "&Self");
             for datum in &record_spec.data {
                 if datum.details().allow_uninit() {
                     clone_from_fn.line(format!(
@@ -116,7 +118,7 @@ impl<const CAP: usize> Clone for CappedRecord0<CAP> {
         })
     }
 
-    fn clone_from(&mut self, source: &Self) {
+    fn clone_from(&mut self, _source: &Self) {
     }
 }
 "#,
