@@ -43,19 +43,19 @@ jobs:
       target: aarch64-unknown-linux-gnu
       rust_toolchain: stable
 
-  cross_1_65_0_i686:
-    name: Rust 1.65.0 i686-unknown-linux-gnu
+  cross_1_79_0_i686:
+    name: Rust 1.79.0 i686-unknown-linux-gnu
     uses: ./.github/workflows/_cross_build.yml
     with:
       target: i686-unknown-linux-gnu
-      rust_toolchain: 1.65.0
+      rust_toolchain: 1.79.0
       pre_build_script: ./scripts/cross_msrv_pin_dependencies.sh
 
-  cross_1_65_0_aarch64:
-    name: Rust 1.65.0 aarch64-unknown-linux-gnu
+  cross_1_79_0_aarch64:
+    name: Rust 1.79.0 aarch64-unknown-linux-gnu
     uses: ./.github/workflows/_cross_build.yml
     with:
       target: aarch64-unknown-linux-gnu
-      rust_toolchain: 1.65.0
+      rust_toolchain: 1.79.0
       pre_build_script: ./scripts/cross_msrv_pin_dependencies.sh
 
