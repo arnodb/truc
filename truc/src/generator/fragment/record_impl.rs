@@ -20,7 +20,6 @@ pub struct RecordImplGenerator;
 impl RecordImplGenerator {
     fn generate_constructor(
         record_spec: &RecordSpec,
-        unpacked_record_name: &str,
         uninit_kind: UninitKind,
         record_impl: &mut Impl,
     ) {
@@ -36,7 +35,10 @@ impl RecordImplGenerator {
                     (UninitKind::Full, false) => "_from",
                     (UninitKind::Full, true) | (UninitKind::Uninit { .. }, _) => "from",
                 },
-                unpacked_record_name,
+                match uninit_kind {
+                    UninitKind::Full => &record_spec.unpacked_record_name,
+                    UninitKind::Uninit { .. } => &record_spec.unpacked_uninit_record_name,
+                },
             )
             .ret("Self");
         let uninit_has_data = if let UninitKind::Uninit { safe_record_name } = uninit_kind {
@@ -115,16 +117,10 @@ impl FragmentGenerator for RecordImplGenerator {
             .generic(CAP_GENERIC)
             .target_generic(CAP);
 
-        Self::generate_constructor(
-            record_spec,
-            &record_spec.unpacked_record_name,
-            UninitKind::Full,
-            record_impl,
-        );
+        Self::generate_constructor(record_spec, UninitKind::Full, record_impl);
 
         Self::generate_constructor(
             record_spec,
-            &record_spec.unpacked_uninit_record_name,
             UninitKind::Uninit {
                 safe_record_name: &record_spec.unpacked_uninit_safe_record_name,
             },
