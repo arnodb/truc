@@ -12,6 +12,7 @@ pub(crate) mod from_previous_record_impls;
 pub(crate) mod from_unpacked_record_impls;
 pub(crate) mod record;
 pub(crate) mod record_impl;
+pub mod record_unnamed_impl;
 pub mod serde;
 
 /// Trait to implement to implement any specific fragment of record definitions.

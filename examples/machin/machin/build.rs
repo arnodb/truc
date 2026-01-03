@@ -4,7 +4,10 @@ use machin_data::MachinEnum;
 use truc::{
     generator::{
         config::GeneratorConfig,
-        fragment::{serde::SerdeImplGenerator, FragmentGenerator},
+        fragment::{
+            record_unnamed_impl::RecordUnnamedImplGenerator, serde::SerdeImplGenerator,
+            FragmentGenerator,
+        },
         generate,
     },
     record::{
@@ -188,11 +191,31 @@ fn index_first_char() {
 
     let def_1 = def_1.build();
     let mut file = File::create(out_dir_path.join("index_first_char_1.rs")).unwrap();
-    write!(file, "{}", generate(&def_1, &GeneratorConfig::default())).unwrap();
+    write!(
+        file,
+        "{}",
+        generate(
+            &def_1,
+            &GeneratorConfig::default_with_custom_generators([
+                Box::new(RecordUnnamedImplGenerator) as Box<dyn FragmentGenerator>,
+            ])
+        )
+    )
+    .unwrap();
 
     let def_2 = def_2.build();
     let mut file = File::create(out_dir_path.join("index_first_char_2.rs")).unwrap();
-    write!(file, "{}", generate(&def_2, &GeneratorConfig::default())).unwrap();
+    write!(
+        file,
+        "{}",
+        generate(
+            &def_2,
+            &GeneratorConfig::default_with_custom_generators([
+                Box::new(RecordUnnamedImplGenerator) as Box<dyn FragmentGenerator>,
+            ])
+        )
+    )
+    .unwrap();
 }
 
 fn serialize_deserialize() {
