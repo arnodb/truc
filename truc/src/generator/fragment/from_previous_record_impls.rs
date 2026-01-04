@@ -65,19 +65,6 @@ impl FromPreviousRecordImplsGenerator {
             )
             .ret("Self");
 
-        for datum in &record_spec.minus_data {
-            from_fn.line(format!(
-                "let {}{}: {} = unsafe {{ from.data.read({}) }};",
-                match into_kind {
-                    IntoKind::IntoSimple => "_",
-                    IntoKind::IntoAndOut => "",
-                },
-                datum.name(),
-                datum.details().type_name(),
-                datum.details().offset(),
-            ));
-        }
-
         if from_kind == FromKind::FromUninit {
             from_fn.line(format!(
                 "let {} = {}{}::from(plus);",
@@ -93,6 +80,20 @@ impl FromPreviousRecordImplsGenerator {
                     .map_or_else(String::new, |generic| format!("::<{}>", generic.typed))
             ));
         }
+
+        for datum in &record_spec.minus_data {
+            from_fn.line(format!(
+                "let {}{}: {} = unsafe {{ from.data.read({}) }};",
+                match into_kind {
+                    IntoKind::IntoSimple => "_",
+                    IntoKind::IntoAndOut => "",
+                },
+                datum.name(),
+                datum.details().type_name(),
+                datum.details().offset(),
+            ));
+        }
+
         from_fn.line("let manually_drop = std::mem::ManuallyDrop::new(from);");
         from_fn.line(format!(
             "let {}data = unsafe {{ std::ptr::read(&manually_drop.data) }};",
@@ -313,9 +314,9 @@ impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedRecordIn1)> for CappedR
 
 impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedUninitRecordIn1)> for CappedRecord1<CAP> {
     fn from((from, plus): (CappedRecord0<CAP>, UnpackedUninitRecordIn1)) -> Self {
+        let plus = UnpackedUninitSafeRecordIn1::<u32>::from(plus);
         let _integer0: u32 = unsafe { from.data.read(0) };
         let _not_copy_integer0: u32 = unsafe { from.data.read(4) };
-        let plus = UnpackedUninitSafeRecordIn1::<u32>::from(plus);
         let manually_drop = std::mem::ManuallyDrop::new(from);
         let mut data = unsafe { std::ptr::read(&manually_drop.data) };
         unsafe { data.write(4, plus.not_copy_integer1); }
@@ -338,9 +339,9 @@ impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedRecordIn1)> for Record1
 
 impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedUninitRecordIn1)> for Record1AndUnpackedOut<CAP> {
     fn from((from, plus): (CappedRecord0<CAP>, UnpackedUninitRecordIn1)) -> Self {
+        let plus = UnpackedUninitSafeRecordIn1::<u32>::from(plus);
         let integer0: u32 = unsafe { from.data.read(0) };
         let not_copy_integer0: u32 = unsafe { from.data.read(4) };
-        let plus = UnpackedUninitSafeRecordIn1::<u32>::from(plus);
         let manually_drop = std::mem::ManuallyDrop::new(from);
         let mut data = unsafe { std::ptr::read(&manually_drop.data) };
         unsafe { data.write(4, plus.not_copy_integer1); }
@@ -416,9 +417,9 @@ impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedRecordIn1)> for CappedR
 
 impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedUninitRecordIn1)> for CappedRecord1<CAP> {
     fn from((from, plus): (CappedRecord0<CAP>, UnpackedUninitRecordIn1)) -> Self {
+        let _plus = UnpackedUninitSafeRecordIn1::from(plus);
         let _integer0: u32 = unsafe { from.data.read(0) };
         let _not_copy_integer0: u32 = unsafe { from.data.read(4) };
-        let _plus = UnpackedUninitSafeRecordIn1::from(plus);
         let manually_drop = std::mem::ManuallyDrop::new(from);
         let data = unsafe { std::ptr::read(&manually_drop.data) };
         Self { data }
@@ -438,9 +439,9 @@ impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedRecordIn1)> for Record1
 
 impl<const CAP: usize> From<(CappedRecord0<CAP>, UnpackedUninitRecordIn1)> for Record1AndUnpackedOut<CAP> {
     fn from((from, plus): (CappedRecord0<CAP>, UnpackedUninitRecordIn1)) -> Self {
+        let _plus = UnpackedUninitSafeRecordIn1::from(plus);
         let integer0: u32 = unsafe { from.data.read(0) };
         let not_copy_integer0: u32 = unsafe { from.data.read(4) };
-        let _plus = UnpackedUninitSafeRecordIn1::from(plus);
         let manually_drop = std::mem::ManuallyDrop::new(from);
         let data = unsafe { std::ptr::read(&manually_drop.data) };
         let record = CappedRecord1 { data };
