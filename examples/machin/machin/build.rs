@@ -2,16 +2,7 @@ use std::{collections::BTreeMap, env, fs::File, io::Write, path::PathBuf};
 
 use machin_data::MachinEnum;
 use truc::{
-    generator::{
-        config::GeneratorConfig,
-        fragment::{
-            from_previous_record_unnamed_fields_impls::FromPreviousRecordUnnamedFieldsImplsGenerator,
-            from_unnamed_fields_impls::FromUnnamedFieldsImplsGenerator,
-            record_unnamed_impl::RecordUnnamedImplGenerator, serde::SerdeImplGenerator,
-            FragmentGenerator,
-        },
-        generate,
-    },
+    generator::{config::GeneratorConfig, generate},
     record::{
         definition::builder::native::{DatumDefinitionOverride, NativeRecordDefinitionBuilder},
         type_resolver::{DynamicTypeInfo, StaticTypeResolver},
@@ -198,12 +189,7 @@ fn index_first_char() {
         "{}",
         generate(
             &def_1,
-            &GeneratorConfig::default_with_custom_generators([
-                Box::new(RecordUnnamedImplGenerator) as Box<dyn FragmentGenerator>,
-                Box::new(FromUnnamedFieldsImplsGenerator) as Box<dyn FragmentGenerator>,
-                Box::new(FromPreviousRecordUnnamedFieldsImplsGenerator)
-                    as Box<dyn FragmentGenerator>,
-            ])
+            &GeneratorConfig::default().with_unnamed_fields_fragments()
         )
     )
     .unwrap();
@@ -215,12 +201,7 @@ fn index_first_char() {
         "{}",
         generate(
             &def_2,
-            &GeneratorConfig::default_with_custom_generators([
-                Box::new(RecordUnnamedImplGenerator) as Box<dyn FragmentGenerator>,
-                Box::new(FromUnnamedFieldsImplsGenerator) as Box<dyn FragmentGenerator>,
-                Box::new(FromPreviousRecordUnnamedFieldsImplsGenerator)
-                    as Box<dyn FragmentGenerator>,
-            ])
+            &GeneratorConfig::default().with_unnamed_fields_fragments()
         )
     )
     .unwrap();
@@ -278,9 +259,7 @@ fn serialize_deserialize() {
         "{}",
         generate(
             &definition,
-            &GeneratorConfig::default_with_custom_generators([
-                Box::new(SerdeImplGenerator) as Box<dyn FragmentGenerator>
-            ])
+            &GeneratorConfig::default().with_serde_fragments()
         )
     )
     .unwrap();

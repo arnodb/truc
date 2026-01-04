@@ -308,22 +308,18 @@ fn generate_data_out_record(
 #[cfg(test)]
 #[cfg_attr(coverage_nightly, coverage(off))]
 mod tests {
-    use fragment::FragmentGenerator;
     use pretty_assertions::assert_eq;
     use rand::Rng;
     use rand_chacha::rand_core::SeedableRng;
     use syn::File;
 
     use super::*;
-    use crate::{
-        generator::fragment::{clone::CloneImplGenerator, serde::SerdeImplGenerator},
-        record::{
-            definition::{
-                builder::native::{DatumDefinitionOverride, NativeRecordDefinitionBuilder},
-                DatumId,
-            },
-            type_resolver::{StaticTypeResolver, TypeResolver},
+    use crate::record::{
+        definition::{
+            builder::native::{DatumDefinitionOverride, NativeRecordDefinitionBuilder},
+            DatumId,
         },
+        type_resolver::{StaticTypeResolver, TypeResolver},
     };
 
     pub(crate) fn assert_fragment_eq(left: &str, right: &str) {
@@ -393,10 +389,11 @@ mod tests {
             let def = definition.build();
             generate(
                 &def,
-                &GeneratorConfig::default_with_custom_generators([
-                    Box::new(CloneImplGenerator) as Box<dyn FragmentGenerator>,
-                    Box::new(SerdeImplGenerator) as Box<dyn FragmentGenerator>,
-                ]),
+                &GeneratorConfig::default()
+                    .with_common_fragments()
+                    .with_unnamed_fields_fragments()
+                    .with_clone_fragments()
+                    .with_serde_fragments(),
             );
         }
     }

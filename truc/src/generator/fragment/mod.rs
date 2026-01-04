@@ -4,18 +4,18 @@ use codegen::Scope;
 
 use crate::record::definition::{DatumDefinition, NativeDatumDetails, RecordVariant};
 
-pub mod clone;
+pub(crate) mod clone;
 pub(crate) mod data_records;
 pub(crate) mod drop_impl;
 pub(crate) mod from_previous_record_data_records;
 pub(crate) mod from_previous_record_impls;
-pub mod from_previous_record_unnamed_fields_impls;
-pub mod from_unnamed_fields_impls;
+pub(crate) mod from_previous_record_unnamed_fields_impls;
+pub(crate) mod from_unnamed_fields_impls;
 pub(crate) mod from_unpacked_record_impls;
 pub(crate) mod record;
 pub(crate) mod record_impl;
-pub mod record_unnamed_impl;
-pub mod serde;
+pub(crate) mod record_unnamed_impl;
+pub(crate) mod serde;
 
 /// Trait to implement to implement any specific fragment of record definitions.
 ///
