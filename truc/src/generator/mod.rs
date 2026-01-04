@@ -158,11 +158,6 @@ pub fn generate_variant<'a>(
     record_spec
 }
 
-struct RecordImplRecordNames<'a> {
-    name: &'a str,
-    unpacked: &'a str,
-}
-
 #[derive(Debug, PartialEq, Eq)]
 enum UninitKind<'a> {
     False,
