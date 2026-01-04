@@ -5,6 +5,7 @@ use truc::{
     generator::{
         config::GeneratorConfig,
         fragment::{
+            from_previous_record_unnamed_fields_impls::FromPreviousRecordUnnamedFieldsImplsGenerator,
             from_unnamed_fields_impls::FromUnnamedFieldsImplsGenerator,
             record_unnamed_impl::RecordUnnamedImplGenerator, serde::SerdeImplGenerator,
             FragmentGenerator,
@@ -200,6 +201,8 @@ fn index_first_char() {
             &GeneratorConfig::default_with_custom_generators([
                 Box::new(RecordUnnamedImplGenerator) as Box<dyn FragmentGenerator>,
                 Box::new(FromUnnamedFieldsImplsGenerator) as Box<dyn FragmentGenerator>,
+                Box::new(FromPreviousRecordUnnamedFieldsImplsGenerator)
+                    as Box<dyn FragmentGenerator>,
             ])
         )
     )
@@ -215,6 +218,8 @@ fn index_first_char() {
             &GeneratorConfig::default_with_custom_generators([
                 Box::new(RecordUnnamedImplGenerator) as Box<dyn FragmentGenerator>,
                 Box::new(FromUnnamedFieldsImplsGenerator) as Box<dyn FragmentGenerator>,
+                Box::new(FromPreviousRecordUnnamedFieldsImplsGenerator)
+                    as Box<dyn FragmentGenerator>,
             ])
         )
     )
