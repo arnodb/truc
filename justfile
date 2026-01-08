@@ -25,6 +25,7 @@ check_all:
     cargo clippy --all-features --all-targets -- -D warnings
     cargo build --all-features
     cargo test --all-features
+    RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
     cd examples/readme && cargo clippy --all-features --all-targets -- -D warnings
 
     just msrv
@@ -38,6 +39,9 @@ check_all:
     cd examples/readme && cargo build
 
     just stable
+
+doc:
+    RUSTDOCFLAGS="-D warnings" cargo doc --all-features --no-deps
 
 # Toolchain management
 

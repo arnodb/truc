@@ -14,6 +14,7 @@ jobs:
       with_rustfmt: true
       with_clippy: true
       with_audit: true
+      with_doc: true
 
   main_1_56_1:
     name: Rust 1.56.1
