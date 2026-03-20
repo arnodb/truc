@@ -4,6 +4,8 @@ set -eu
 
 set -x
 
+export CARGO_NET_GIT_FETCH_WITH_CLI=true
+
 cargo update -p ppv-lite86 --precise 0.2.17
 cargo update -p derive_more --precise 0.99.17
 cargo update -p either --precise 1.13.0
@@ -16,6 +18,7 @@ cargo update -p quote --precise 1.0.40
 cargo update -p proc-macro2 --precise 1.0.101
 cargo update -p ryu --precise 1.0.20
 cargo update -p itoa --precise 1.0.15
+cargo update -p unicode-ident --precise 1.0.22
 
 cd examples/readme
 
@@ -25,6 +28,7 @@ cargo update -p quote --precise 1.0.40
 cargo update -p proc-macro2 --precise 1.0.101
 cargo update -p ryu --precise 1.0.20
 cargo update -p itoa --precise 1.0.15
+cargo update -p unicode-ident --precise 1.0.22
 
 cd -
 
